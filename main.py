@@ -1,270 +1,207 @@
+"""DOTA MAGIC: voice-only control with local game-state integration."""
 import json
 import queue
+import re
 import time
+import tkinter as tk
 from pathlib import Path
+from tkinter import ttk
 
-import cv2
-import mediapipe as mp
 import pyautogui
 import sounddevice as sd
-import numpy as np
-from PIL import Image, ImageDraw, ImageFont
-from mediapipe.tasks import python
-from mediapipe.tasks.python import vision
 from vosk import KaldiRecognizer, Model, SetLogLevel
 
-from controls import GestureTrigger, NAMES, VOICE_KEYS, VOICE_PHRASES, classify_hand, voice_commands
+from controls import NAMES, VOICE_KEYS, VOICE_PHRASES, voice_commands
 from integration.gsi import GSIState, start_server
 from spell_planner import plan_spell
 from whisper_capture import PhraseCapture
+from voice_policy import is_stop_result
+from laughter import LaughterDetector, LaughterPlayer
 
 ROOT = Path(__file__).resolve().parent
-FONT_PATH = '/System/Library/Fonts/Supplemental/Arial.ttf'
-HINTS = [
-    'Q  Куас — указательный',
-    'W  Векс — указательный + средний',
-    'E  Экзорт — большой + указательный в кольцо',
-    'R  Инвоук — указательный + мизинец',
-    'D  Первый — большой палец вверх',
-    'F  Второй — большой палец вниз',
-    'Стоп — выключить ввод',
-]
-
-
-def draw_hints(frame, font):
-    height, width = frame.shape[:2]
-    image = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)).convert('RGBA')
-    overlay = Image.new('RGBA', image.size, (0, 0, 0, 0))
-    draw = ImageDraw.Draw(overlay)
-    spacing = max(19, min(27, height // 18))
-    top = max(140, height - spacing * len(HINTS) - 42)
-    if top + spacing * len(HINTS) + 8 > height - 25:
-        top = max(0, height - spacing * len(HINTS) - 28)
-    panel_width = min(width - 8, max(int(draw.textlength(line, font=font)) for line in HINTS) + 24)
-    draw.rounded_rectangle((4, top, panel_width, top + spacing * len(HINTS) + 8), radius=8, fill=(0, 0, 0, 190))
-    for index, line in enumerate(HINTS):
-        draw.text((12, top + 4 + index * spacing), line, font=font, fill=(255, 255, 255, 255))
-    image = Image.alpha_composite(image, overlay).convert('RGB')
-    return cv2.cvtColor(np.asarray(image), cv2.COLOR_RGB2BGR)
 
 
 def main():
-    audio = queue.Queue(maxsize=32)
-    overflow = False
+    audio = queue.Queue(maxsize=64)
+    state = {'enabled': False, 'overflow': False, 'pending': None, 'awaiting': None, 'playback': False, 'enabled_at': 0.0}
+    gsi = GSIState()
+    server = capture = stream = laughter = player = None
+    root = tk.Tk()
+    root.title('DOTA MAGIC — голосовое управление')
+    root.geometry('620x340')
+    status = tk.StringVar(value='Ввод выключен')
+    slots_text = tk.StringVar(value='GSI: ожидание данных Invoker')
+    voice_text = tk.StringVar(value='Голосовая модель загружается')
+    last_text = tk.StringVar(value='Ожидание команды')
+    ttk.Label(root, text='DOTA MAGIC', font=('Arial', 22, 'bold')).pack(pady=12)
+    ttk.Label(root, textvariable=status, font=('Arial', 15, 'bold')).pack(pady=5)
+    ttk.Label(root, textvariable=slots_text).pack(pady=5)
+    ttk.Label(root, textvariable=voice_text).pack(pady=5)
+    ttk.Label(root, textvariable=last_text, wraplength=580).pack(pady=5)
+    buttons = ttk.Frame(root)
+    buttons.pack(pady=10)
 
-    def callback(indata, frames, time_info, status):
-        nonlocal overflow
-        if status:
-            overflow = True
-        try:
-            audio.put_nowait(bytes(indata))
-        except queue.Full:
-            overflow = True
+    def disable(reason='Ввод выключен'):
+        state.update(enabled=False, pending=None, awaiting=None)
+        if capture:
+            capture.cancel()
+        status.set(reason)
+        print(reason, flush=True)
 
-    camera = None
-    gsi_server = None
-    enabled = False
-    trigger = GestureTrigger()
-    message = ''
-    message_until = 0.0
-    capture = None
-    pending = None
-    awaiting = None
+    def enable():
+        if not capture.ready:
+            status.set('Модель ещё загружается или недоступна')
+            return
+        disable('Подготовка к запуску')
+        recognizer.Reset()
+        while not audio.empty():
+            try: audio.get_nowait()
+            except queue.Empty: break
+        state['enabled'] = True
+        state['enabled_at'] = time.monotonic()
+        status.set('Ввод включён — переключись в Dota')
+        print('Ввод включён.', flush=True)
 
-    def send(key, source):
-        nonlocal enabled, message, message_until
+    ttk.Button(buttons, text='Включить', command=enable).pack(side='left', padx=8)
+    ttk.Button(buttons, text='СТОП', command=lambda: disable('Остановлено кнопкой')).pack(side='left', padx=8)
+    ttk.Label(root, text='Скажи «стоп», чтобы выключить управление.').pack(pady=5)
+
+    def callback(indata, frames, time_info, flags):
+        if flags: state['overflow'] = True
+        data = bytes(indata)
+        try: audio.put_nowait(data)
+        except queue.Full: state['overflow'] = True
+        if state['enabled'] and capture and not state['playback']:
+            capture.feed(data)
+        if laughter:
+            laughter.feed(data if state['enabled'] and not state['playback'] else bytes(len(data)))
+
+    def send(key):
         try:
             pyautogui.press(key)
-            message = f'{source}: {NAMES[key]} [{key.upper()}]'
-            message_until = time.monotonic() + 1.5
-            print(message, flush=True)
-        except Exception as error:
-            enabled = False
-            trigger.reset()
-            print('Ввод отключён из-за ошибки:', error, flush=True)
+            last_text.set(f'Отправлено: {NAMES[key]} [{key.upper()}]')
+            print('VOICE:', key.upper(), flush=True)
+        except Exception as exc:
+            disable('Ошибка ввода: ' + str(exc))
+
+    def tick():
+        if player:
+            state['playback'] = player.is_playing()
+        if laughter:
+            while True:
+                try: detected_at = laughter.events.get_nowait()
+                except queue.Empty: break
+                if state['enabled'] and detected_at >= state['enabled_at'] and time.monotonic() - detected_at < 2:
+                    try:
+                        chosen = player.play()
+                        if chosen:
+                            state['playback'] = True
+                            capture.cancel()
+                            last_text.set('Смех: воспроизводится реплика Invoker')
+                            print('Реплика Invoker:', chosen, flush=True)
+                    except OSError as error:
+                        print('Не удалось воспроизвести реплику:', error, flush=True)
+        commands = []
+        while True:
+            try: chunk = audio.get_nowait()
+            except queue.Empty: break
+            if recognizer.AcceptWaveform(chunk):
+                result = json.loads(recognizer.Result())
+                if is_stop_result(result):
+                    commands.append('stop')
+        if state['overflow']:
+            state['overflow'] = False
+            recognizer.Reset()
+            capture.cancel()
+            state.update(pending=None, awaiting=None)
+            last_text.set('Сбой аудио: действие отменено, слушаю следующую команду')
+            print('Аудио восстановлено; ввод остаётся включённым.', flush=True)
+        if 'stop' in commands and state['enabled']:
+            disable('Остановлено командой «стоп»')
+        pending, awaiting = state['pending'], state['awaiting']
+        while not pending and not awaiting:
+            try: token, text, error, received = capture.results.get_nowait()
+            except queue.Empty: break
+            if token != capture.token or not state['enabled'] or time.monotonic() - received > 1:
+                continue
+            if error:
+                last_text.set('Распознавание восстанавливается: ' + error)
+                print('Ошибка Whisper, ожидаю следующую команду:', error, flush=True)
+                continue
+            print('Whisper:', text, flush=True)
+            normalized = ' '.join(re.sub(r'[^\w\s]', ' ', text.lower()).split())
+            if normalized == 'стоп':
+                disable('Остановлено командой «стоп»')
+                break
+            direct = {**VOICE_KEYS, **VOICE_PHRASES}.get(normalized)
+            if direct:
+                send(direct)
+                continue
+            plan = plan_spell(text, gsi.snapshot(max_age=2))
+            if not plan:
+                last_text.set('Фраза не распознана или нет свежих данных GSI')
+                continue
+            last_text.set(f'{plan.kind}: {plan.spell} ({plan.score:.0%})')
+            print('План:', plan, flush=True)
+            if plan.kind == 'prepare':
+                pending = {'keys': list(plan.keys), 'spell': plan.spell, 'next': time.monotonic()}
+                state['pending'] = pending
+            else:
+                send(plan.keys)
+        now = time.monotonic()
+        if pending and state['enabled'] and now >= pending['next']:
+            if gsi.snapshot(max_age=2) is None:
+                state['pending'] = None
+                last_text.set('Нет GSI — подготовка отменена, слушаю дальше')
+            else:
+                key = pending['keys'].pop(0)
+                send(key)
+                if state['enabled']:
+                    if pending['keys']:
+                        pending['next'] = now + .12
+                    else:
+                        state['pending'] = None
+                        state['awaiting'] = {'spell': pending['spell'], 'deadline': now + 4}
+        awaiting = state['awaiting']
+        if awaiting:
+            current = gsi.snapshot(max_age=2)
+            if current and 'invoker_' + awaiting['spell'].replace(' ', '_') in current:
+                last_text.set('Подготовлено: ' + awaiting['spell'])
+                state['awaiting'] = None
+            elif now > awaiting['deadline']:
+                last_text.set('GSI не подтвердил подготовку')
+                state['awaiting'] = None
+        slots = gsi.snapshot()
+        slots_text.set(f'D: {slots[0]} | F: {slots[1]}' if slots else 'GSI: ожидание данных Invoker')
+        voice_text.set(('Голос готов' if capture.ready else 'Голосовая модель загружается') + f' | уровень {capture.level:.3f} | пропущено {capture.dropped}')
+        root.after(10, tick)
 
     try:
-        gsi = GSIState()
-        gsi_server = start_server(gsi)
-        print('GSI запущен: ожидание данных Dota 2 на 127.0.0.1:38742.', flush=True)
-        hint_font = ImageFont.truetype(FONT_PATH, 15)
+        server = start_server(gsi)
         device = sd.query_devices(kind='input')
         rate = int(device['default_samplerate'])
         capture = PhraseCapture(rate)
+        try:
+            laughter = LaughterDetector(rate)
+            player = LaughterPlayer()
+        except (OSError, ValueError) as error:
+            print('Детектор смеха недоступен:', error, flush=True)
         SetLogLevel(-1)
         model = Model(str(ROOT / 'models/vosk-model-small-ru-0.22'))
-        vocabulary = [word for word in VOICE_KEYS if model.vosk_model_find_word(word) >= 0]
-        vocabulary += list(VOICE_PHRASES) + ['стоп', '[unk]']
-        recognizer = KaldiRecognizer(model, rate, json.dumps(vocabulary, ensure_ascii=False))
-        options = vision.HandLandmarkerOptions(
-            base_options=python.BaseOptions(model_asset_path=str(ROOT / 'models/hand_landmarker.task')),
-            running_mode=vision.RunningMode.VIDEO, num_hands=2,
-        )
-        camera = cv2.VideoCapture(0)
-        if not camera.isOpened():
-            print('Не удалось открыть камеру. Проверьте разрешение macOS.')
-            return
-        with vision.HandLandmarker.create_from_options(options) as detector, sd.RawInputStream(
-            samplerate=rate, blocksize=8000, dtype='int16', channels=1, callback=callback
-        ):
-            last_timestamp = -1
-            previous_slots = None
-            print('Пробел в окне камеры — вкл/выкл. Esc — выход. «Стоп» — выключить всё.')
-            print('Перед первым жестом покажите раскрытую правую ладонь.')
-            while True:
-                # Process pending speech before permitting a gesture action.
-                commands = []
-                while True:
-                    try:
-                        chunk = audio.get_nowait()
-                    except queue.Empty:
-                        break
-                    capture.feed(chunk)
-                    if recognizer.AcceptWaveform(chunk):
-                        text = json.loads(recognizer.Result()).get('text', '')
-                        if text:
-                            print('Речь:', text, flush=True)
-                        commands.extend(voice_commands(text))
-                    else:
-                        partial = json.loads(recognizer.PartialResult()).get('partial', '')
-                        if 'стоп' in partial.split():
-                            commands.append('stop')
-                if overflow or 'stop' in commands:
-                    enabled = False
-                    trigger.reset()
-                    capture.cancel()
-                    pending = None
-                    awaiting = None
-                    message = 'INPUT OFF'
-                    message_until = time.monotonic() + 1.5
-                    if overflow:
-                        recognizer.Reset()
-                        print('Ввод отключён: потеря аудиоданных.', flush=True)
-                        overflow = False
-                elif enabled and not (capture.recording or capture.busy or pending or awaiting):
-                    for command in commands:
-                        if enabled:
-                            send(command, 'VOICE')
-                while True:
-                    try:
-                        token, transcript, error = capture.results.get_nowait()
-                    except queue.Empty:
-                        break
-                    if token != capture.token or not enabled:
-                        continue
-                    if error:
-                        print('Ошибка Whisper:', error, flush=True)
-                        continue
-                    print('Whisper:', transcript, flush=True)
-                    plan = plan_spell(transcript, gsi.snapshot())
-                    if plan is None or pending or awaiting:
-                        print('Команда не распознана или GSI недоступен.', flush=True)
-                        continue
-                    print(f'План: {plan.kind} {plan.spell} ({plan.score:.0%})', flush=True)
-                    if plan.kind == 'prepare':
-                        pending = {'keys': list(plan.keys), 'spell': plan.spell, 'next': time.monotonic()}
-                    else:
-                        send(plan.keys, 'VOICE')
-                now = time.monotonic()
-                if pending and enabled and now >= pending['next']:
-                    if gsi.snapshot(max_age=2) is None:
-                        print('Подготовка отменена: нет свежих данных GSI.', flush=True)
-                        pending = None
-                    else:
-                        key = pending['keys'].pop(0)
-                        send(key, 'VOICE')
-                        if not enabled:
-                            pending = None
-                        elif not pending['keys']:
-                            awaiting = {'spell': pending['spell'], 'deadline': now + 4}
-                            pending = None
-                        else:
-                            pending['next'] = now + 0.2
-                if awaiting:
-                    expected = 'invoker_' + awaiting['spell'].replace(' ', '_')
-                    current = gsi.snapshot(max_age=2)
-                    if current and expected in current:
-                        print('GSI подтвердил подготовку:', awaiting['spell'], flush=True)
-                        awaiting = None
-                    elif now > awaiting['deadline']:
-                        print('GSI не подтвердил подготовку; проверьте игру.', flush=True)
-                        awaiting = None
-                ok, frame = camera.read()
-                if not ok:
-                    print('Не удалось получить кадр.')
-                    break
-                frame = cv2.flip(frame, 1)
-                height, width = frame.shape[:2]
-                rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                timestamp = max(time.monotonic_ns() // 1_000_000, last_timestamp + 1)
-                last_timestamp = timestamp
-                result = detector.detect_for_video(mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb), timestamp)
-                gesture = None
-                for hand, handedness in zip(result.hand_landmarks, result.handedness):
-                    if handedness[0].category_name != 'Right' or handedness[0].score < 0.75:
-                        continue
-                    gesture = classify_hand(hand, width, height)
-                    points = [(int(p.x * width), int(p.y * height)) for p in hand]
-                    for c in vision.HandLandmarksConnections.HAND_CONNECTIONS:
-                        cv2.line(frame, points[c.start], points[c.end], (0, 220, 0), 2)
-                    for point in points:
-                        cv2.circle(frame, point, 4, (0, 100, 255), -1)
-                    break
-                if enabled and not (capture.recording or capture.busy or pending or awaiting):
-                    action = trigger.update(gesture, time.monotonic())
-                    if action:
-                        send(action, 'HAND')
-                color = (0, 255, 100) if enabled else (0, 100, 255)
-                slots = gsi.snapshot()
-                if slots != previous_slots:
-                    print('GSI D/F:', ' / '.join(slots) if slots else 'данные недоступны', flush=True)
-                    previous_slots = slots
-                if slots:
-                    labels = [name.removeprefix('invoker_').replace('_', ' ').upper() for name in slots]
-                    cv2.putText(frame, f'D: {labels[0]}  F: {labels[1]}', (20, 160), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 255, 255), 2)
-                else:
-                    cv2.putText(frame, 'GSI: WAITING / NO INVOKER', (20, 160), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 180, 255), 2)
-                status = 'INPUT ON' if enabled else 'INPUT OFF'
-                cv2.putText(frame, status, (20, 35), cv2.FONT_HERSHEY_SIMPLEX, 0.8, color, 2)
-                detected = NAMES.get(gesture, gesture or 'no right hand')
-                cv2.putText(frame, f'Hand: {detected}', (20, 65), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
-                if enabled and not trigger.ready:
-                    cv2.putText(frame, 'Show open RIGHT palm to arm gestures', (20, 95), cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 1)
-                if time.monotonic() < message_until:
-                    cv2.putText(frame, message, (20, 130), cv2.FONT_HERSHEY_SIMPLEX, 0.7, color, 2)
-                cv2.putText(frame, 'SPACE: toggle | ESC: quit', (20, height - 20), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
-                cv2.putText(frame, 'V: record phrase' + (' (recording)' if capture.recording else ' (processing)' if capture.busy else ''), (20, 190), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (255, 255, 255), 1)
-                frame = draw_hints(frame, hint_font)
-                cv2.imshow('DOTA MAGIC', frame)
-                key = cv2.waitKey(1) & 0xff
-                if key == 27:
-                    break
-                if key == ord(' '):
-                    enabled = not enabled
-                    trigger.reset()
-                    capture.cancel()
-                    pending = None
-                    awaiting = None
-                    recognizer.Reset()
-                    while not audio.empty():
-                        try:
-                            audio.get_nowait()
-                        except queue.Empty:
-                            break
-                    print('Ввод включён.' if enabled else 'Ввод выключен.', flush=True)
-                if key == ord('v') and enabled and not pending and not awaiting:
-                    if capture.start():
-                        print('Запись фразы: говорите 4 секунды.', flush=True)
-    except Exception as error:
-        print('Ошибка камеры, микрофона или модели:', error)
-        print('Если порт GSI занят, закройте inspect_gsi.py и перезапустите программу.')
+        # A restricted grammar could force unrelated speech into "стоп".
+        recognizer = KaldiRecognizer(model, rate)
+        recognizer.SetWords(True)
+        pyautogui.PAUSE = .01
+        stream = sd.RawInputStream(samplerate=rate, blocksize=1024, dtype='int16', channels=1, callback=callback)
+        stream.start()
+        root.after(10, tick)
+        root.mainloop()
     finally:
-        if gsi_server is not None:
-            gsi_server.shutdown()
-            gsi_server.server_close()
-        if camera is not None:
-            camera.release()
-        cv2.destroyAllWindows()
+        if stream: stream.stop(); stream.close()
+        if laughter: laughter.close()
+        if player: player.close()
+        if capture: capture.close()
+        if server: server.shutdown(); server.server_close()
 
 
 if __name__ == '__main__':

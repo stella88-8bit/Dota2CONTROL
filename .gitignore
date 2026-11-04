@@ -4,3 +4,7 @@
 __pycache__/
 *.py[cod]
 .venv/
+whisper-worker.log
+/experiments/laughter/voices/
+/experiments/laughter/analyze-laughter
+/experiments/laughter/stream-laughter
