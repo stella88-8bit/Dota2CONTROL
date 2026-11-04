@@ -1,0 +1,281 @@
+{
+  "mode": "simulated_game_real_controller_and_http_no_keyboard_or_microphone",
+  "simulated_key_api_ms": 16,
+  "simulated_game_gsi_delay_ms": 1000.0,
+  "orb_levels": [
+    8,
+    8,
+    9
+  ],
+  "invoke_cooldown_enforced": true,
+  "database_timing_enabled": true,
+  "gui_and_console_not_serviced_during_combos": true,
+  "measurements": [
+    {
+      "phrase": "мама я миракл",
+      "total_ms": 3954.27,
+      "dispatch_ms": 2950.18,
+      "first_cast_ms": 133.94,
+      "inter_spell_ms": [
+        202.44,
+        1578.68,
+        1035.2
+      ],
+      "http_median_ms": 1.63,
+      "http_max_ms": 2.08,
+      "cast_order_verified": true,
+      "timing_plan": {
+        "order": [
+          "tornado",
+          "emp",
+          "chaos meteor",
+          "deafening blast"
+        ],
+        "warmup": [],
+        "hero_level": 30,
+        "orb_levels": [
+          8,
+          8,
+          9
+        ],
+        "target_distance_units": 600.0,
+        "invoke_cooldown_s": 0.0,
+        "cast_offsets_s": {
+          "tornado": 0.113,
+          "emp": 0.30100000000000005,
+          "chaos meteor": 1.8930000000000002,
+          "deafening blast": 2.913034632034632
+        },
+        "invoke_offsets_s": {
+          "invoke:tornado": {
+            "spell": "tornado",
+            "time_s": 0.048
+          },
+          "invoke:emp": {
+            "spell": "emp",
+            "time_s": 0.23600000000000002
+          },
+          "invoke:chaos meteor": {
+            "spell": "chaos meteor",
+            "time_s": 0.42400000000000004
+          },
+          "invoke:deafening blast": {
+            "spell": "deafening blast",
+            "time_s": 2.0160000000000005
+          }
+        },
+        "tornado_landing_s": 3.1630000000000003,
+        "impact_latency_s": {
+          "tornado": 0.45,
+          "emp": 2.9499999999999997,
+          "chaos meteor": 1.35,
+          "deafening blast": 0.41796536796536793
+        },
+        "synchronized": true,
+        "warnings": [],
+        "blocked_reason": null,
+        "source_sha256": "72046fa3d6f49ce24e6c126ff93983ae859900039799b30895c95df9a8b17229",
+        "assumptions": [
+          "stationary point target at supplied distance",
+          "manual mouse aim",
+          "base lift duration; no unknown enemy modifiers",
+          "no movement forced by cast range, no spell block or immunity"
+        ]
+      },
+      "predicted_impacts_not_measured_game_hits": {
+        "emp": {
+          "impact_after_command_s": 2.9499999999999997,
+          "relative_to_landing_s": 0.1024358750146348,
+          "within_nominal_window": true
+        },
+        "chaos meteor": {
+          "impact_after_command_s": 1.35,
+          "relative_to_landing_s": 0.08111700002336875,
+          "within_nominal_window": true
+        },
+        "deafening blast": {
+          "impact_after_command_s": 0.41796536796536793,
+          "relative_to_landing_s": 0.18427740896004252,
+          "within_nominal_window": true
+        }
+      }
+    },
+    {
+      "phrase": "от меня не убежишь",
+      "total_ms": 2809.83,
+      "dispatch_ms": 1802.94,
+      "first_cast_ms": 127.16,
+      "inter_spell_ms": [
+        204.37,
+        1267.06,
+        204.41
+      ],
+      "http_median_ms": 1.55,
+      "http_max_ms": 2.01,
+      "cast_order_verified": true,
+      "timing_plan": {
+        "order": [
+          "ice wall",
+          "cold snap",
+          "forge spirit",
+          "alacrity"
+        ],
+        "warmup": [],
+        "hero_level": 30,
+        "orb_levels": [
+          8,
+          8,
+          9
+        ],
+        "target_distance_units": 600.0,
+        "invoke_cooldown_s": 0.0,
+        "cast_offsets_s": {
+          "ice wall": 0.113,
+          "cold snap": 0.30100000000000005,
+          "forge spirit": 0.48900000000000005,
+          "alacrity": 0.677
+        },
+        "invoke_offsets_s": {
+          "invoke:ice wall": {
+            "spell": "ice wall",
+            "time_s": 0.048
+          },
+          "invoke:cold snap": {
+            "spell": "cold snap",
+            "time_s": 0.23600000000000002
+          },
+          "invoke:forge spirit": {
+            "spell": "forge spirit",
+            "time_s": 0.42400000000000004
+          },
+          "invoke:alacrity": {
+            "spell": "alacrity",
+            "time_s": 0.6120000000000001
+          }
+        },
+        "tornado_landing_s": null,
+        "impact_latency_s": {
+          "ice wall": 0.05,
+          "cold snap": 0.05,
+          "forge spirit": 0.05,
+          "alacrity": 0.05
+        },
+        "synchronized": true,
+        "warnings": [
+          "Ice Wall: нужна ориентация героя; стена создаётся на 200 ед. впереди."
+        ],
+        "blocked_reason": null,
+        "source_sha256": "72046fa3d6f49ce24e6c126ff93983ae859900039799b30895c95df9a8b17229",
+        "assumptions": [
+          "stationary point target at supplied distance",
+          "manual mouse aim",
+          "base lift duration; no unknown enemy modifiers",
+          "no movement forced by cast range, no spell block or immunity"
+        ]
+      },
+      "predicted_impacts_not_measured_game_hits": {}
+    },
+    {
+      "phrase": "мой любимый 2007 й",
+      "total_ms": 4326.97,
+      "dispatch_ms": 3265.13,
+      "first_cast_ms": 132.64,
+      "inter_spell_ms": [
+        1382.86,
+        402.03,
+        1058.5,
+        289.16
+      ],
+      "http_median_ms": 1.69,
+      "http_max_ms": 2.03,
+      "cast_order_verified": true,
+      "timing_plan": {
+        "order": [
+          "tornado",
+          "sun strike",
+          "chaos meteor",
+          "deafening blast",
+          "cold snap"
+        ],
+        "warmup": [],
+        "hero_level": 30,
+        "orb_levels": [
+          8,
+          8,
+          9
+        ],
+        "target_distance_units": 600.0,
+        "invoke_cooldown_s": 0.0,
+        "cast_offsets_s": {
+          "tornado": 0.113,
+          "sun strike": 1.4930000000000003,
+          "chaos meteor": 1.8930000000000002,
+          "deafening blast": 2.9550346320346326,
+          "cold snap": 3.2430000000000003
+        },
+        "invoke_offsets_s": {
+          "invoke:tornado": {
+            "spell": "tornado",
+            "time_s": 0.048
+          },
+          "invoke:sun strike": {
+            "spell": "sun strike",
+            "time_s": 0.23600000000000002
+          },
+          "invoke:chaos meteor": {
+            "spell": "chaos meteor",
+            "time_s": 1.6160000000000003
+          },
+          "invoke:deafening blast": {
+            "spell": "deafening blast",
+            "time_s": 2.0160000000000005
+          },
+          "invoke:cold snap": {
+            "spell": "cold snap",
+            "time_s": 3.078034632034633
+          }
+        },
+        "tornado_landing_s": 3.1630000000000003,
+        "impact_latency_s": {
+          "tornado": 0.45,
+          "sun strike": 1.75,
+          "chaos meteor": 1.35,
+          "deafening blast": 0.41796536796536793,
+          "cold snap": 0.05
+        },
+        "synchronized": true,
+        "warnings": [],
+        "blocked_reason": null,
+        "source_sha256": "72046fa3d6f49ce24e6c126ff93983ae859900039799b30895c95df9a8b17229",
+        "assumptions": [
+          "stationary point target at supplied distance",
+          "manual mouse aim",
+          "base lift duration; no unknown enemy modifiers",
+          "no movement forced by cast range, no spell block or immunity"
+        ]
+      },
+      "predicted_impacts_not_measured_game_hits": {
+        "sun strike": {
+          "impact_after_command_s": 1.75,
+          "relative_to_landing_s": 0.08286233301623724,
+          "within_nominal_window": true
+        },
+        "chaos meteor": {
+          "impact_after_command_s": 1.35,
+          "relative_to_landing_s": 0.08488825001404621,
+          "within_nominal_window": true
+        },
+        "deafening blast": {
+          "impact_after_command_s": 0.41796536796536793,
+          "relative_to_landing_s": 0.21135286797652952,
+          "within_nominal_window": true
+        },
+        "cold snap": {
+          "impact_after_command_s": 0.05,
+          "relative_to_landing_s": 0.13254454199341126,
+          "within_nominal_window": true
+        }
+      }
+    }
+  ]
+}

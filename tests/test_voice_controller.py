@@ -36,10 +36,10 @@ def wait_for(predicate):
 
 
 class ControllerTests(unittest.TestCase):
-    def setup_control(self, spells, cold_snap_target=True):
+    def setup_control(self, spells, cold_snap_target=True, database=None):
         self.capture = Capture()
         self.gsi = GSIState()
-        self.payload = {'hero': {'name': 'npc_dota_hero_invoker'}, 'abilities': {
+        self.payload = {'hero': {'name': 'npc_dota_hero_invoker','level':30,'mana':9999}, 'abilities': {
             **{'ability' + str(i): {'name': 'invoker_' + name, 'level': 8}
                for i, name in enumerate(('quas', 'wex', 'exort'))},
             'ability3': {'name': 'empty'}, 'ability4': {'name': 'empty'},
@@ -69,7 +69,7 @@ class ControllerTests(unittest.TestCase):
             self.gsi.update(copy.deepcopy(self.payload))
 
         self.gsi.update(copy.deepcopy(self.payload))
-        self.control = VoiceController(self.gsi, self.capture, send, activity=Mock())
+        self.control = VoiceController(self.gsi, self.capture, send, activity=Mock(),spell_database=database)
         self.addCleanup(self.control.close)
         self.control.enable()
         self.assertTrue(wait_for(lambda: self.control.enabled))
@@ -133,6 +133,49 @@ class ControllerTests(unittest.TestCase):
         self.assertTrue(wait_for(lambda: not self.control.enabled))
         self.control.close()
         self.assertEqual(len(self.sent), 1)
+
+    def test_database_plan_is_executed_by_voice_controller(self):
+        from invoker_database import SpellDatabase
+        self.setup_control(COMBOS['мой любимый 2007 й'],database=SpellDatabase())
+        self.capture.recognize('мой любимый 2007 й')
+        self.assertTrue(self.finished.wait(8))
+        self.assertTrue(wait_for(lambda:self.control.active is None))
+        run=self.control.last_run
+        self.assertIsNotNone(run.timing)
+        self.assertEqual(self.casts,[(s,s=='alacrity') for s in run.timing.order])
+        self.assertEqual(run.timing.order[-1],'cold snap')
+        self.assertTrue(self.control.enabled)
+
+    def test_insufficient_mana_rejects_combo_without_disabling_voice(self):
+        from invoker_database import SpellDatabase
+        self.setup_control(COMBOS['мама я миракл'],database=SpellDatabase())
+        self.payload['hero']['mana']=1
+        self.gsi.update(copy.deepcopy(self.payload))
+        self.capture.recognize('мама я миракл')
+        messages=[]
+        def rejected():
+            while not self.control.events.empty():
+                messages.append(self.control.events.get_nowait()[1])
+            return any('маны' in message for message in messages)
+        self.assertTrue(wait_for(rejected))
+        self.assertEqual(self.sent,[])
+        self.assertTrue(self.control.enabled)
+
+    def test_no_common_tornado_window_is_rejected_before_sending(self):
+        from invoker_database import SpellDatabase
+        self.setup_control(COMBOS['мама я миракл'],database=SpellDatabase())
+        for index in range(3):
+            self.payload['abilities']['ability'+str(index)]['level']=1
+        self.gsi.update(copy.deepcopy(self.payload))
+        self.capture.recognize('мама я миракл')
+        messages=[]
+        def rejected():
+            while not self.control.events.empty():
+                messages.append(self.control.events.get_nowait()[1])
+            return any('общего окна' in message for message in messages)
+        self.assertTrue(wait_for(rejected))
+        self.assertEqual(self.sent,[])
+        self.assertTrue(self.control.enabled)
 
 
 if __name__ == '__main__':

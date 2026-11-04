@@ -13,6 +13,7 @@ from whisper_capture import PhraseCapture
 from laughter import LaughterDetector, LaughterPlayer
 from voice_controller import VoiceController
 from voice_stop import StopListener
+from invoker_database import SpellDatabase, ensure_database
 
 ROOT = Path(__file__).resolve().parent
 
@@ -22,16 +23,45 @@ def main():
     server = capture = stream = laughter = player = controller = stop_listener = None
     root = tk.Tk()
     root.title('DOTA MAGIC — голосовое управление')
-    root.geometry('620x340')
+    root.geometry('660x520')
     status = tk.StringVar(value='Ввод выключен')
     slots_text = tk.StringVar(value='GSI: ожидание данных Invoker')
     voice_text = tk.StringVar(value='Голосовая модель загружается')
     last_text = tk.StringVar(value='Ожидание команды')
+    levels_text = tk.StringVar(value='Уровни Invoker: ожидание GSI')
     ttk.Label(root, text='DOTA MAGIC', font=('Arial', 22, 'bold')).pack(pady=12)
     ttk.Label(root, textvariable=status, font=('Arial', 15, 'bold')).pack(pady=5)
     ttk.Label(root, textvariable=slots_text).pack(pady=5)
     ttk.Label(root, textvariable=voice_text).pack(pady=5)
     ttk.Label(root, textvariable=last_text, wraplength=580).pack(pady=5)
+    ttk.Label(root, textvariable=levels_text).pack(pady=3)
+    distance = tk.DoubleVar(value=600)
+    distance_text = tk.StringVar(value='Расстояние до цели: примерно 600 ед.')
+    scepter_choice = tk.StringVar(value='Авто')
+    shard_choice = tk.StringVar(value='Авто')
+    require_window = tk.BooleanVar(value=True)
+    choices = {'Авто': None, 'Quas': 1, 'Wex': 2, 'Exort': 3}
+
+    def update_timing(*_):
+        value = round(distance.get()/25)*25
+        distance_text.set(f'Расстояние до цели: примерно {value:g} ед.')
+        if controller:
+            controller.set_timing_options(value, choices[scepter_choice.get()], choices[shard_choice.get()],require_window.get())
+
+    ttk.Label(root, textvariable=distance_text).pack(pady=2)
+    ttk.Scale(root, from_=0, to=1200, variable=distance, command=update_timing).pack(fill='x', padx=55)
+    upgrades = ttk.Frame(root)
+    upgrades.pack(pady=6)
+    ttk.Label(upgrades, text='Выбранный в игре Scepter:').pack(side='left')
+    scepter_box = ttk.Combobox(upgrades, textvariable=scepter_choice, values=list(choices), width=7, state='readonly')
+    scepter_box.pack(side='left', padx=5)
+    ttk.Label(upgrades, text='Shard:').pack(side='left')
+    shard_box = ttk.Combobox(upgrades, textvariable=shard_choice, values=list(choices), width=7, state='readonly')
+    shard_box.pack(side='left', padx=5)
+    for box in (scepter_box, shard_box):
+        box.bind('<<ComboboxSelected>>', update_timing)
+    ttk.Checkbutton(root,text='Требовать общее окно попадания после Tornado',variable=require_window,command=update_timing).pack(pady=3)
+    ttk.Label(root, text='GSI не сообщает положение врага. Укажи дистанцию и наведи курсор на цель.', wraplength=600).pack(pady=5)
     buttons = ttk.Frame(root)
     buttons.pack(pady=10)
     ttk.Button(buttons, text='Включить', command=lambda: controller.enable()).pack(side='left', padx=8)
@@ -74,9 +104,17 @@ def main():
         slots_text.set(f'D: {slots[0]} | F: {slots[1]}' if slots else 'GSI: ожидание данных Invoker')
         voice_text.set(('Голос готов' if capture.ready else 'Голосовая модель загружается')
                        + f' | уровень {capture.level:.3f} | пропущено {capture.dropped}')
+        hero, abilities, _ = gsi.read_context(max_age=5)
+        if hero and abilities:
+            ranks = [abilities.get('ability'+str(i),{}).get('level','?') for i in range(3)]
+            levels_text.set(f'Invoker {hero.get("level", "?")} | Quas {ranks[0]} · Wex {ranks[1]} · Exort {ranks[2]}')
+        else:
+            levels_text.set('Уровни Invoker: ожидание GSI')
         root.after(50, refresh)
 
     try:
+        database = SpellDatabase(ensure_database())
+        print('База Invoker: ' + database.metadata['source_sha256'][:12] + ' (данные установленной игры)', flush=True)
         server = start_server(gsi)
         device = sd.query_devices(kind='input')
         rate = int(device['default_samplerate'])
@@ -92,7 +130,8 @@ def main():
         recognizer.SetWords(True)
         pyautogui.PAUSE = 0
         pyautogui.DARWIN_CATCH_UP_TIME = .005
-        controller = VoiceController(gsi, capture, send, laughter, player)
+        controller = VoiceController(gsi, capture, send, laughter, player, spell_database=database)
+        update_timing()
         stop_listener = StopListener(
             recognizer,
             lambda token: controller.disable('Остановлено командой «стоп»', token),

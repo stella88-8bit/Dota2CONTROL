@@ -25,11 +25,14 @@ def invoke_cooldown(details):
 class PredictiveComboRunner:
     predictive = True
 
-    def __init__(self, spells, now):
+    def __init__(self, spells, now, timing=None):
         self.spells = list(spells)
+        self.timing = timing
+        self.warmup = list(timing.warmup) if timing is not None else []
+        self.warmup_index = 0
         self.started_at = now
         self.index = 0
-        self.phase = 'choose'
+        self.phase = 'warmup_choose' if self.warmup else 'choose'
         self.next_at = now
         self.deadline = now + 15
         self.complete = False
@@ -51,6 +54,12 @@ class PredictiveComboRunner:
         self.dispatch_complete_at = None
         self.verify_until = None
         self.verification_timed_out = False
+        self._waiting_timing = set()
+
+    def _cooldown(self, details):
+        if self.timing is not None:
+            return self.timing.invoke_cooldown
+        return invoke_cooldown(details)
 
     def _note(self, text, now):
         self.events.append(('note', text, now, None))
@@ -62,7 +71,7 @@ class PredictiveComboRunner:
         actual = tuple(details['ability' + str(i)].get('name') for i in (3, 4))
         if self.slots is None:
             self.slots = actual
-            self._note(f'Быстрый прокаст; расчётная перезарядка Invoke {invoke_cooldown(details):.3f} с', now)
+            self._note(f'Расчётная перезарядка Invoke {self._cooldown(details):.3f} с', now)
         for i in (3, 4):
             ability = details['ability' + str(i)]
             spell = ability.get('name', '').removeprefix('invoker_').replace('_', ' ')
@@ -76,12 +85,12 @@ class PredictiveComboRunner:
         elif actual == self.slots and packet_at >= self.last_invoke_at + INVOKE_SETTLE:
             if invoke.get('can_cast') is True:
                 self.invoke_ready_at = min(self.invoke_ready_at, now)
-            elif invoke.get('cooldown', 0) > invoke_cooldown(details) + 1:
+            elif invoke.get('cooldown', 0) > self._cooldown(details) + 1:
                 # Remaining cooldown may come from a snapshot generated long
                 # before receipt (and may be rounded). Do not restart the normal
                 # cooldown at packet arrival. Extend only for a larger discrepancy.
                 self.invoke_ready_at = max(self.invoke_ready_at, now + invoke['cooldown'])
-            if self.phase == 'invoke':
+            if self.phase in ('invoke','warmup_invoke'):
                 self.next_at = min(self.next_at, max(now + KEY_GAP, self.invoke_ready_at))
         if actual == self.slots:
             self.mismatch = None
@@ -99,7 +108,9 @@ class PredictiveComboRunner:
         self.slots = actual
         self.mismatch_count = 0
         self._note('GSI: корректирую прогноз ячеек по двум согласованным пакетам', now)
-        if self.phase not in ('verify', 'cast_confirm'):
+        if self.phase.startswith('warmup_'):
+            self.phase, self.keys = 'warmup_choose', []
+        elif self.phase not in ('verify', 'cast_confirm'):
             spell = self.spells[self.index]
             self.corrections[spell] = self.corrections.get(spell, 0) + 1
             if self.corrections[spell] > 2:
@@ -120,13 +131,17 @@ class PredictiveComboRunner:
         return ('d' if self.slots.index(expected) == 0 else 'f') if expected in self.slots else None
 
     def _advance(self, now):
+        settle = (self.timing.cast_point(self.spells[self.index]) + .025
+                  if self.timing is not None else CAST_SETTLE)
         self.index += 1
-        self.next_at = now + CAST_SETTLE
+        self.next_at = now + settle
         if self.index == len(self.spells):
             self.phase = 'verify'
-            self.dispatch_complete_at = now
+            announced = self.dispatch_complete_at is not None
+            self.dispatch_complete_at = max(self.sent.values())
             self.verify_until = now + VERIFY_TIMEOUT
-            self._note(f'Команды прокаста отправлены за {now-self.started_at:.3f} с; проверка GSI продолжается', now)
+            if not announced:
+                self._note(f'Команды прокаста отправлены за {self.dispatch_complete_at-self.started_at:.3f} с; проверка GSI продолжается', now)
         else:
             self.phase = 'choose'
             self.deadline = now + 15
@@ -179,6 +194,40 @@ class PredictiveComboRunner:
         # new packet per action. Loss of the feed pauses dispatch.
         if details is None or self.slots is None or now < self.next_at:
             return None
+        if self.phase.startswith('warmup_'):
+            while self.warmup_index < len(self.warmup):
+                prepared = self.warmup[self.warmup_index]
+                if self.phase == 'warmup_choose':
+                    if self._slot(prepared) is not None:
+                        self.warmup_index += 1
+                        continue
+                    self.keys = list(ORBS[prepared])
+                    self.phase = 'warmup_orbs'
+                    self._note('Предварительная подготовка: ' + prepared, now)
+                if self.phase == 'warmup_orbs':
+                    key = self.keys.pop(0)
+                    self.next_at = now + KEY_GAP
+                    if not self.keys:
+                        self.phase = 'warmup_invoke'
+                    return key, False
+                if self.phase == 'warmup_invoke':
+                    invoke = details.get('ability5', {})
+                    if now < self.invoke_ready_at:
+                        self.next_at = self.invoke_ready_at
+                        return None
+                    if invoke.get('can_cast') not in (True,False):
+                        return None
+                    if self.last_invoke_at is None and invoke.get('can_cast') is False and invoke.get('cooldown',0) <= 0:
+                        return None
+                    self.slots = ('invoker_' + prepared.replace(' ','_'), self.slots[0])
+                    self.last_invoke_at = now
+                    self.invoke_ready_at = now + self._cooldown(details)
+                    self.next_at = now + INVOKE_SETTLE
+                    self.events.append(('invoke',prepared,now,None))
+                    self.warmup_index += 1
+                    self.phase = 'warmup_choose'
+                    return 'r', False
+            self.phase = 'choose'
         spell = self.spells[self.index]
         if self.phase == 'cast_confirm':  # Targeted Cold Snap: preserve retry-until-hit.
             if spell in self.confirmed:
@@ -222,12 +271,20 @@ class PredictiveComboRunner:
                 return None
             self.slots = ('invoker_' + spell.replace(' ', '_'), self.slots[0])
             self.last_invoke_at = now
-            self.invoke_ready_at = now + invoke_cooldown(details)
+            self.invoke_ready_at = now + self._cooldown(details)
             self.next_at = now + INVOKE_SETTLE
             self.phase = 'cast'
             self.events.append(('invoke', spell, now, None))
             return 'r', False
         if self.phase == 'cast':
+            if self.timing is not None:
+                release = self.timing.release_at(spell, self.sent, self.started_at)
+                if now < release:
+                    self.next_at = release
+                    if spell not in self._waiting_timing:
+                        self._waiting_timing.add(spell)
+                        self._note(f'Синхронизация {spell}: отправка не раньше {release-self.started_at:.3f} с',now)
+                    return None
             slot = self._slot(spell)
             if slot is None:
                 self.phase = 'choose'
@@ -244,6 +301,9 @@ class PredictiveComboRunner:
                 self.phase = 'cast_confirm'
                 self.deadline = float('inf')
                 self.next_at = now + TARGET_RETRY_INTERVAL
+                if self.index == len(self.spells)-1:
+                    self.dispatch_complete_at = now
+                    self._note(f'Команды прокаста отправлены за {now-self.started_at:.3f} с; ожидаю подтверждения Cold Snap',now)
             else:
                 self._advance(now)
             return slot, spell == 'alacrity'

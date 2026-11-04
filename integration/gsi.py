@@ -12,6 +12,7 @@ class GSIState:
         self._updated = None
         self._slots = None
         self._abilities = None
+        self._hero = None
         self.changed = threading.Event()
         self._intervals = deque(maxlen=64)
 
@@ -30,6 +31,7 @@ class GSIState:
             self._updated = now
             self._slots = slots
             self._abilities = abilities if slots else None
+            self._hero = hero if slots else None
         self.changed.set()
 
     def timing_summary(self):
@@ -54,6 +56,13 @@ class GSIState:
             if self._updated is None or time.monotonic() - self._updated > max_age:
                 return None, self._updated
             return self._abilities, self._updated
+
+    def read_context(self, max_age=2):
+        """Return hero, abilities and receive time from the same GSI packet."""
+        with self._lock:
+            if self._updated is None or time.monotonic() - self._updated > max_age:
+                return None, None, self._updated
+            return self._hero, self._abilities, self._updated
 
     def snapshot(self, max_age=5, after=None):
         with self._lock:

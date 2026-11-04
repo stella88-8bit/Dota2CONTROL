@@ -10,13 +10,19 @@ from combos import match_combo
 from controls import NAMES, VOICE_KEYS, VOICE_PHRASES
 from low_latency import LowLatencyActivity
 from spell_planner import plan_spell
+from combo_timing import plan_combo
 
 
 class VoiceController:
-    def __init__(self, gsi, capture, send, laughter=None, player=None, activity=None):
+    def __init__(self, gsi, capture, send, laughter=None, player=None, activity=None,
+                 spell_database=None, target_distance=600):
         self.gsi, self.capture, self.send = gsi, capture, send
         self.laughter, self.player = laughter, player
         self.activity = activity if activity is not None else LowLatencyActivity()
+        self.spell_database = spell_database
+        self.target_distance = target_distance
+        self.scepter_option = self.shard_option = None
+        self.require_tornado_window = True
         self.enabled = self.playback = False
         self.enabled_at = 0.0
         self.active = None
@@ -44,6 +50,9 @@ class VoiceController:
 
     def audio_error(self, token):
         self._command('audio_error', token=token)
+
+    def set_timing_options(self, distance, scepter_option=None, shard_option=None, require_tornado_window=True):
+        self._command('timing', (float(distance), scepter_option, shard_option, bool(require_tornado_window)))
 
     def _disable(self, reason):
         self.enabled = False
@@ -78,6 +87,8 @@ class VoiceController:
                 self.active = None
                 self.capture.cancel()
                 self._emit('last', 'Сбой аудио: действие отменено, слушаю следующую команду')
+            elif kind == 'timing':
+                self.target_distance, self.scepter_option, self.shard_option, self.require_tornado_window = value
 
     def _results(self):
         while self.active is None:
@@ -119,8 +130,41 @@ class VoiceController:
                 return
 
     def _start(self, spells, label, received, predictive=False):
+        timing = None
+        if predictive and self.spell_database is not None:
+            hero, abilities, _ = self.gsi.read_context()
+            try:
+                if not hero or not abilities:
+                    raise ValueError('Нет свежих данных героя GSI')
+                if hero.get('alive') is False or hero.get('stunned') or hero.get('silenced') or hero.get('hexed'):
+                    raise ValueError('Invoker сейчас не может применять заклинания')
+                profile = self.spell_database.from_gsi(hero, abilities,
+                    scepter_option=self.scepter_option, shard_option=self.shard_option)
+                timing = plan_combo(spells, profile, abilities, self.target_distance,
+                                    self.spell_database.metadata['source_sha256'])
+                if timing.blocked_reason:
+                    raise ValueError(timing.blocked_reason)
+                if 'tornado' in spells and not timing.synchronized and self.require_tornado_window:
+                    raise ValueError('В модели нет общего окна попадания после Tornado при этих уровнях и дистанции. Можно изменить условия или снять требование общего окна.')
+                mana = sum(profile['spells'][s]['values'].get('AbilityManaCost',0) for s in spells)
+                if hero.get('mana') is not None and hero['mana'] < mana:
+                    raise ValueError(f'Для полного прокаста нужно {mana:g} маны; доступно {hero["mana"]:g}')
+            except ValueError as error:
+                self._emit('last', 'Прокаст не запущен: ' + str(error))
+                self._emit('log', 'Прокаст не запущен: ' + str(error))
+                return
+            spells = timing.order
+            self._emit('log', f'Профиль: уровень {profile["hero_level"]}, Q/W/E {profile["levels"]}; расстояние {self.target_distance:g} ед. (оценка)')
+            self._emit('log', 'Порядок по таймингам: ' + ' → '.join(spells))
+            if timing.landing is not None:
+                self._emit('log', f'Расчётное приземление Tornado: {timing.landing:.3f} с от начала; подъём {timing.nominal_lift:.3f} с')
+            for warning in timing.warnings:
+                self._emit('log', 'Условие прокаста: ' + warning)
+            if hero.get('aghanims_scepter') and profile['scepter_option'] is None:
+                self._emit('log', 'Выбор Scepter не определён GSI: укажи выбранную сферу в окне программы.')
         now = time.monotonic()
-        self.active = (PredictiveComboRunner if predictive else ComboRunner)(spells, received)
+        self.active = (PredictiveComboRunner(spells, received, timing=timing) if predictive
+                       else ComboRunner(spells, received))
         self._emit('last', label)
         self._emit('log', f'{label} — начало [0.000 с]; очередь команды {(now-received)*1000:.1f} мс')
 
@@ -182,6 +226,10 @@ class VoiceController:
                 missing = ', '.join(s for s in run.spells if s not in run.confirmed) or 'нет'
                 message = (f'Отправка прокаста: {dispatched:.3f} с; проверка завершена через {elapsed:.3f} с. '
                            f'Не подтверждены GSI: {missing}')
+                if run.timing is not None:
+                    estimates = run.timing.impact_report(run.sent, run.started_at)
+                    for spell, estimate in estimates.items():
+                        self._emit('log', f'Расчёт {spell}: {estimate["relative_to_landing_s"]:+.3f} с от приземления (оценка, не подтверждение попадания)')
             self._emit('last', message)
             self._emit('log', message)
             self._emit('log', self.gsi.timing_summary())

@@ -17,6 +17,7 @@ from combos import COMBOS
 from integration.gsi import GSIState, start_server
 from voice_controller import VoiceController
 from predictive_combo import invoke_cooldown
+from invoker_database import SpellDatabase
 
 
 class Capture:
@@ -32,11 +33,11 @@ class Capture:
 
 
 class Game:
-    def __init__(self, port, spells, key_ms, gsi_ms):
+    def __init__(self, port, spells, key_ms, gsi_ms, levels=(7,7,7), timed=False):
         self.port, self.spells = port, spells
         self.key_delay, self.gsi_delay = key_ms / 1000, gsi_ms / 1000
-        self.payload = {'hero': {'name': 'npc_dota_hero_invoker'}, 'abilities': {
-            **{'ability' + str(i): {'name': 'invoker_' + name, 'level': 7}
+        self.payload = {'hero': {'name': 'npc_dota_hero_invoker','level':30,'mana':9999}, 'abilities': {
+            **{'ability' + str(i): {'name': 'invoker_' + name, 'level': levels[i]}
                for i, name in enumerate(('quas', 'wex', 'exort'))},
             'ability3': {'name': 'empty'}, 'ability4': {'name': 'empty'},
             'ability5': {'can_cast': True}}}
@@ -47,6 +48,7 @@ class Game:
         self.orbs, self.casts, self.requests = [], [], []
         self.error = None
         self.invoke_ready_at = 0
+        self.cooldown = max(.05,SpellDatabase().profile(30,*levels)['invoke_cooldown']) if timed else invoke_cooldown(self.payload['abilities'])
         self._post()
         self.thread = threading.Thread(target=self._run, daemon=True)
         self.poster = threading.Thread(target=self._publish, daemon=True)
@@ -103,7 +105,7 @@ class Game:
                     abilities['ability4'] = copy.deepcopy(abilities['ability3'])
                     abilities['ability3'] = {'name': 'invoker_' + spell.replace(' ', '_'),
                                              'can_cast': True, 'cooldown': 0}
-                    self.invoke_ready_at = time.monotonic() + invoke_cooldown(abilities)
+                    self.invoke_ready_at = time.monotonic() + self.cooldown
                 else:
                     ability = abilities['ability3' if key == 'd' else 'ability4']
                     if ability.get('can_cast') is not True:
@@ -126,13 +128,13 @@ class Game:
         self.poster.join(timeout=3)
 
 
-def measure(phrase, spells, key_ms, gsi_ms):
+def measure(phrase, spells, key_ms, gsi_ms, timed=False, levels=(7,7,7), distance=600):
     state, capture = GSIState(), Capture()
     server = start_server(state, port=0)
     game = control = None
     try:
-        game = Game(server.server_port, spells, key_ms, gsi_ms)
-        control = VoiceController(state, capture, game.send)
+        game = Game(server.server_port, spells, key_ms, gsi_ms, levels, timed)
+        control = VoiceController(state, capture, game.send, spell_database=SpellDatabase() if timed else None,target_distance=distance)
         control.enable()
         deadline = time.monotonic() + 2
         while not control.enabled:
@@ -143,7 +145,7 @@ def measure(phrase, spells, key_ms, gsi_ms):
         capture.results.put((capture.token, phrase, None, received))
         capture.wakeup.set()
         # Deliberately do not consume GUI/log events during execution.
-        if not game.finished.wait(max(10, len(spells) * (2 * gsi_ms / 1000 + 1) + 5)):
+        if not game.finished.wait(max(40 if timed else 10, len(spells) * (2 * gsi_ms / 1000 + 1) + 5)):
             raise RuntimeError('Combo timed out')
         if game.error:
             raise game.error
@@ -154,16 +156,25 @@ def measure(phrase, spells, key_ms, gsi_ms):
             time.sleep(.001)
         elapsed = time.monotonic() - received
         actual = [(spell, target) for _, spell, target in game.casts]
-        expected = [(spell, spell == 'alacrity') for spell in spells]
+        expected = [(spell, spell == 'alacrity') for spell in control.last_run.spells]
         if actual != expected:
             raise RuntimeError(f'Wrong cast order: {actual!r}')
         stamps = [stamp for stamp, _, _ in game.casts]
-        return {'phrase': phrase, 'total_ms': round(elapsed * 1000, 2),
+        report = {'phrase': phrase, 'total_ms': round(elapsed * 1000, 2),
                 'dispatch_ms': round((control.last_run.dispatch_complete_at - received) * 1000, 2),
                 'first_cast_ms': round((stamps[0] - received) * 1000, 2),
                 'inter_spell_ms': [round((b-a)*1000, 2) for a, b in zip(stamps, stamps[1:])],
                 'http_median_ms': round(statistics.median(game.requests), 2),
                 'http_max_ms': round(max(game.requests), 2), 'cast_order_verified': True}
+        if timed:
+            plan=control.last_run.timing
+            report['timing_plan']=plan.as_dict()
+            report['predicted_impacts_not_measured_game_hits']=plan.impact_report(
+                {spell:stamp for stamp,spell,_ in game.casts},received)
+            if plan.synchronized and plan.landing is not None:
+                if not all(item['within_nominal_window'] for item in report['predicted_impacts_not_measured_game_hits'].values()):
+                    raise RuntimeError('Real controller timing missed the nominal model window')
+        return report
     finally:
         if control:
             control.close()
@@ -179,14 +190,19 @@ def main():
     parser.add_argument('--gsi-ms', type=float, default=30)
     parser.add_argument('--repeats', type=int, default=3)
     parser.add_argument('--output', type=Path)
+    parser.add_argument('--timed',action='store_true',help='Use the level database and impact scheduler')
+    parser.add_argument('--levels',type=int,nargs=3,default=(7,7,7),metavar=('QUAS','WEX','EXORT'))
+    parser.add_argument('--distance',type=float,default=600)
     args = parser.parse_args()
     if args.key_ms < 0 or args.gsi_ms < 0 or args.repeats < 1:
         parser.error('Delays must be nonnegative and repeats positive')
-    measurements = [measure(phrase, spells, args.key_ms, args.gsi_ms)
+    if any(not 1<=rank<=9 for rank in args.levels):
+        parser.error('Benchmark orb levels must be 1..9')
+    measurements = [measure(phrase, spells, args.key_ms, args.gsi_ms,args.timed,tuple(args.levels),args.distance)
                     for _ in range(args.repeats) for phrase, spells in COMBOS.items()]
     report = {'mode': 'simulated_game_real_controller_and_http_no_keyboard_or_microphone',
               'simulated_key_api_ms': args.key_ms, 'simulated_game_gsi_delay_ms': args.gsi_ms,
-              'orb_levels': [7, 7, 7], 'invoke_cooldown_enforced': True,
+              'orb_levels': args.levels, 'invoke_cooldown_enforced': True,'database_timing_enabled':args.timed,
               'gui_and_console_not_serviced_during_combos': True, 'measurements': measurements}
     rendered = json.dumps(report, ensure_ascii=False, indent=2)
     if args.output:

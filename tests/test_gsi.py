@@ -35,6 +35,19 @@ class GsiTests(unittest.TestCase):
         state.update(payload)
         self.assertEqual(state.snapshot(after=marker), ('invoker_emp', 'invoker_sun_strike'))
 
+    def test_hero_and_orbs_are_read_from_same_packet(self):
+        state=GSIState()
+        abilities={'ability3':{'name':'invoker_emp'},'ability4':{'name':'invoker_sun_strike'},
+                   'ability0':{'name':'invoker_quas','level':3}}
+        state.update({'hero':{'name':'npc_dota_hero_invoker','level':7},'abilities':abilities})
+        hero,spells,stamp=state.read_context()
+        self.assertEqual(hero['level'],7)
+        self.assertEqual(spells['ability0']['level'],3)
+        self.assertIsNotNone(stamp)
+        self.assertEqual(state.read_context(max_age=-1)[:2],(None,None))
+        state.update({'hero':{'name':'npc_dota_hero_axe'},'abilities':abilities})
+        self.assertEqual(state.read_context()[:2],(None,None))
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -8,6 +8,8 @@ class ComboTests(unittest.TestCase):
         self.assertEqual(match_combo('Мама, я Миракл!')[1], COMBOS['мама я миракл'])
         self.assertEqual(match_combo('Мой любимый две тысячи седьмой')[1], COMBOS['мой любимый 2007 й'])
         self.assertIsNone(match_combo('совсем другие слова'))
+        self.assertEqual(match_combo('Рэмпейдж')[1], COMBOS['ремпейдж'])
+        self.assertEqual(match_combo('Rampage')[1], COMBOS['ремпейдж'])
 
     def test_prepare_confirm_and_self_cast(self):
         run = ComboRunner(('alacrity',), 0)
