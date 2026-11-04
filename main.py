@@ -14,6 +14,7 @@ from mediapipe.tasks.python import vision
 from vosk import KaldiRecognizer, Model, SetLogLevel
 
 from controls import GestureTrigger, NAMES, VOICE_KEYS, VOICE_PHRASES, classify_hand, voice_commands
+from integration.gsi import GSIState, start_server
 
 ROOT = Path(__file__).resolve().parent
 FONT_PATH = '/System/Library/Fonts/Supplemental/Arial.ttf'
@@ -59,6 +60,7 @@ def main():
             overflow = True
 
     camera = None
+    gsi_server = None
     enabled = False
     trigger = GestureTrigger()
     message = ''
@@ -77,6 +79,9 @@ def main():
             print('Ввод отключён из-за ошибки:', error, flush=True)
 
     try:
+        gsi = GSIState()
+        gsi_server = start_server(gsi)
+        print('GSI запущен: ожидание данных Dota 2 на 127.0.0.1:38742.', flush=True)
         hint_font = ImageFont.truetype(FONT_PATH, 15)
         device = sd.query_devices(kind='input')
         rate = int(device['default_samplerate'])
@@ -97,6 +102,7 @@ def main():
             samplerate=rate, blocksize=8000, dtype='int16', channels=1, callback=callback
         ):
             last_timestamp = -1
+            previous_slots = None
             print('Пробел в окне камеры — вкл/выкл. Esc — выход. «Стоп» — выключить всё.')
             print('Перед первым жестом покажите раскрытую правую ладонь.')
             while True:
@@ -155,6 +161,15 @@ def main():
                     if action:
                         send(action, 'HAND')
                 color = (0, 255, 100) if enabled else (0, 100, 255)
+                slots = gsi.snapshot()
+                if slots != previous_slots:
+                    print('GSI D/F:', ' / '.join(slots) if slots else 'данные недоступны', flush=True)
+                    previous_slots = slots
+                if slots:
+                    labels = [name.removeprefix('invoker_').replace('_', ' ').upper() for name in slots]
+                    cv2.putText(frame, f'D: {labels[0]}  F: {labels[1]}', (20, 160), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 255, 255), 2)
+                else:
+                    cv2.putText(frame, 'GSI: WAITING / NO INVOKER', (20, 160), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 180, 255), 2)
                 status = 'INPUT ON' if enabled else 'INPUT OFF'
                 cv2.putText(frame, status, (20, 35), cv2.FONT_HERSHEY_SIMPLEX, 0.8, color, 2)
                 detected = NAMES.get(gesture, gesture or 'no right hand')
@@ -181,7 +196,11 @@ def main():
                     print('Ввод включён.' if enabled else 'Ввод выключен.', flush=True)
     except Exception as error:
         print('Ошибка камеры, микрофона или модели:', error)
+        print('Если порт GSI занят, закройте inspect_gsi.py и перезапустите программу.')
     finally:
+        if gsi_server is not None:
+            gsi_server.shutdown()
+            gsi_server.server_close()
         if camera is not None:
             camera.release()
         cv2.destroyAllWindows()

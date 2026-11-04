@@ -1,0 +1,6 @@
+/integration/whisper.cpp/
+/models/ggml-small-q5_1.bin
+.DS_Store
+__pycache__/
+*.py[cod]
+.venv/
