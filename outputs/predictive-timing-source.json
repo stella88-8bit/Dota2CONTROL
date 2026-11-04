@@ -1,0 +1,8 @@
+{
+  "source": "Installed Dota 2 pak01_dir.vpk: scripts/npc/heroes/npc_dota_hero_invoker.txt",
+  "invoke_base_cooldown_seconds": 7,
+  "invoke_reduction_per_orb_level_seconds": 0.3,
+  "spell_cast_point_seconds": 0.05,
+  "controller_invoke_settle_seconds": 0.065,
+  "controller_cast_settle_seconds": 0.075
+}

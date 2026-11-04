@@ -26,6 +26,7 @@ class PhraseCapture:
         self.last_timing = ''
         self.dropped = 0
         self.results = queue.Queue()
+        self.wakeup = None
         self._audio = queue.Queue(maxsize=128)
         self._jobs = queue.Queue(maxsize=2)
         self._closed = threading.Event()
@@ -160,6 +161,8 @@ class PhraseCapture:
                     # Old/cancelled results must never produce delayed game actions.
                     if token == self.token and done - ended < 3:
                         self.results.put((token, text, None, done))
+                        if self.wakeup is not None:
+                            self.wakeup.set()
                         print('VOICE timing:', self.last_timing, flush=True)
                     else:
                         self.dropped += 1
@@ -168,6 +171,8 @@ class PhraseCapture:
             if not self._closed.is_set():
                 self._force_cpu = True
                 self.results.put((self.token, '', str(exc), time.monotonic()))
+                if self.wakeup is not None:
+                    self.wakeup.set()
         finally:
             self.busy = self.ready = False
             if self._process and self._process.poll() is None:

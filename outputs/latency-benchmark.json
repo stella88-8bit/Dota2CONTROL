@@ -1,0 +1,128 @@
+{
+  "mode": "simulated_game_real_controller_and_http_no_keyboard_or_microphone",
+  "simulated_key_api_ms": 16,
+  "simulated_game_gsi_delay_ms": 30,
+  "gui_and_console_not_serviced_during_combos": true,
+  "measurements": [
+    {
+      "phrase": "мама я миракл",
+      "total_ms": 515.45,
+      "first_cast_ms": 97.82,
+      "inter_spell_ms": [
+        127.7,
+        133.46,
+        122.75
+      ],
+      "http_median_ms": 1.26,
+      "http_max_ms": 2.26,
+      "cast_order_verified": true
+    },
+    {
+      "phrase": "от меня не убежишь",
+      "total_ms": 518.7,
+      "first_cast_ms": 94.99,
+      "inter_spell_ms": [
+        129.91,
+        129.88,
+        127.0
+      ],
+      "http_median_ms": 1.5,
+      "http_max_ms": 1.79,
+      "cast_order_verified": true
+    },
+    {
+      "phrase": "мой любимый 2007 й",
+      "total_ms": 619.72,
+      "first_cast_ms": 91.36,
+      "inter_spell_ms": [
+        122.04,
+        122.6,
+        123.97,
+        124.02
+      ],
+      "http_median_ms": 1.36,
+      "http_max_ms": 1.65,
+      "cast_order_verified": true
+    },
+    {
+      "phrase": "мама я миракл",
+      "total_ms": 510.83,
+      "first_cast_ms": 91.08,
+      "inter_spell_ms": [
+        125.74,
+        126.32,
+        131.52
+      ],
+      "http_median_ms": 1.46,
+      "http_max_ms": 1.79,
+      "cast_order_verified": true
+    },
+    {
+      "phrase": "от меня не убежишь",
+      "total_ms": 520.16,
+      "first_cast_ms": 96.75,
+      "inter_spell_ms": [
+        129.2,
+        131.39,
+        128.54
+      ],
+      "http_median_ms": 1.42,
+      "http_max_ms": 1.79,
+      "cast_order_verified": true
+    },
+    {
+      "phrase": "мой любимый 2007 й",
+      "total_ms": 644.12,
+      "first_cast_ms": 93.63,
+      "inter_spell_ms": [
+        130.96,
+        127.02,
+        132.19,
+        126.05
+      ],
+      "http_median_ms": 1.53,
+      "http_max_ms": 2.0,
+      "cast_order_verified": true
+    },
+    {
+      "phrase": "мама я миракл",
+      "total_ms": 520.2,
+      "first_cast_ms": 95.6,
+      "inter_spell_ms": [
+        128.49,
+        132.49,
+        131.42
+      ],
+      "http_median_ms": 1.31,
+      "http_max_ms": 1.65,
+      "cast_order_verified": true
+    },
+    {
+      "phrase": "от меня не убежишь",
+      "total_ms": 512.7,
+      "first_cast_ms": 92.3,
+      "inter_spell_ms": [
+        131.82,
+        126.41,
+        125.72
+      ],
+      "http_median_ms": 1.43,
+      "http_max_ms": 1.61,
+      "cast_order_verified": true
+    },
+    {
+      "phrase": "мой любимый 2007 й",
+      "total_ms": 638.0,
+      "first_cast_ms": 98.76,
+      "inter_spell_ms": [
+        124.79,
+        126.72,
+        122.76,
+        128.24
+      ],
+      "http_median_ms": 1.64,
+      "http_max_ms": 1.97,
+      "cast_order_verified": true
+    }
+  ]
+}

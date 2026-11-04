@@ -1,0 +1,48 @@
+{
+  "mode": "simulated_game_real_controller_and_http_no_keyboard_or_microphone",
+  "simulated_key_api_ms": 16,
+  "simulated_game_gsi_delay_ms": 1000.0,
+  "gui_and_console_not_serviced_during_combos": true,
+  "measurements": [
+    {
+      "phrase": "мама я миракл",
+      "total_ms": 8101.33,
+      "first_cast_ms": 1061.2,
+      "inter_spell_ms": [
+        2014.61,
+        2012.37,
+        2008.24
+      ],
+      "http_median_ms": 1.14,
+      "http_max_ms": 2.41,
+      "cast_order_verified": true
+    },
+    {
+      "phrase": "от меня не убежишь",
+      "total_ms": 8118.35,
+      "first_cast_ms": 1068.32,
+      "inter_spell_ms": [
+        2012.27,
+        2021.83,
+        2012.92
+      ],
+      "http_median_ms": 1.47,
+      "http_max_ms": 1.84,
+      "cast_order_verified": true
+    },
+    {
+      "phrase": "мой любимый 2007 й",
+      "total_ms": 10112.06,
+      "first_cast_ms": 1061.82,
+      "inter_spell_ms": [
+        2011.99,
+        2011.36,
+        2010.41,
+        2009.57
+      ],
+      "http_median_ms": 1.27,
+      "http_max_ms": 1.78,
+      "cast_order_verified": true
+    }
+  ]
+}

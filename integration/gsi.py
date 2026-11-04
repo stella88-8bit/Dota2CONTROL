@@ -2,6 +2,7 @@
 import json
 import threading
 import time
+from collections import deque
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 
@@ -11,6 +12,8 @@ class GSIState:
         self._updated = None
         self._slots = None
         self._abilities = None
+        self.changed = threading.Event()
+        self._intervals = deque(maxlen=64)
 
     def update(self, data):
         hero = data.get('hero')
@@ -21,9 +24,22 @@ class GSIState:
             if isinstance(a, dict) and isinstance(b, dict) and isinstance(a.get('name'), str) and isinstance(b.get('name'), str):
                 slots = (a['name'], b['name'])
         with self._lock:
-            self._updated = time.monotonic()
+            now = time.monotonic()
+            if self._updated is not None:
+                self._intervals.append(now - self._updated)
+            self._updated = now
             self._slots = slots
             self._abilities = abilities if slots else None
+        self.changed.set()
+
+    def timing_summary(self):
+        with self._lock:
+            intervals = sorted(self._intervals)
+        if not intervals:
+            return 'GSI: недостаточно пакетов для измерения интервала'
+        median = intervals[len(intervals) // 2]
+        return (f'GSI: интервал пакетов медиана {median*1000:.1f} мс, '
+                f'максимум {intervals[-1]*1000:.1f} мс (последние {len(intervals)})')
 
     def details(self, max_age=2, after=None):
         with self._lock:
@@ -31,6 +47,13 @@ class GSIState:
                     or (after is not None and self._updated <= after)):
                 return None
             return self._abilities
+
+    def read(self, max_age=2):
+        """Return data and its receive timestamp atomically for prediction."""
+        with self._lock:
+            if self._updated is None or time.monotonic() - self._updated > max_age:
+                return None, self._updated
+            return self._abilities, self._updated
 
     def snapshot(self, max_age=5, after=None):
         with self._lock:
@@ -52,6 +75,8 @@ def start_server(state, port=38742):
                     raise ValueError('invalid payload')
                 state.update(payload)
                 self.send_response(200)
+                self.send_header('Content-Length', '2')
+                self.send_header('Connection', 'close')
                 self.end_headers()
                 self.wfile.write(b'OK')
             except (ValueError, TypeError):

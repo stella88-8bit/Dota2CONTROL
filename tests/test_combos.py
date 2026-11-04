@@ -43,13 +43,67 @@ class ComboTests(unittest.TestCase):
                 'ability4': {'name': 'invoker_emp', 'can_cast': True, 'cooldown': 0},
                 'ability5': {'can_cast': True}}
         self.assertEqual(run.step(0, data), ('d', False))
-        self.assertIsNone(run.step(.2, data))
+        self.assertIsNone(run.step(.02, data))
         self.assertEqual(run.step(.4, data), ('d', False))
         self.assertEqual(run.index, 0)
         data['ability3']['cooldown'] = 10
-        self.assertIsNone(run.step(.8, data))
+        self.assertEqual(run.step(.8, data), ('f', False))
         self.assertEqual(run.index, 1)
-        self.assertEqual(run.step(1.1, data), ('f', False))
+        self.assertIsNone(run.step(1.1, data))
+
+    def test_confirmation_ignores_retry_delay_and_starts_next_immediately(self):
+        run = ComboRunner(('cold snap', 'emp'), 0)
+        data = {'ability3': {'name': 'invoker_cold_snap', 'can_cast': True, 'cooldown': 0},
+                'ability4': {'name': 'invoker_emp', 'can_cast': True, 'cooldown': 0},
+                'ability5': {'can_cast': True}}
+        self.assertEqual(run.step(0, data), ('d', False))
+        data['ability3']['cooldown'] = 10
+        self.assertEqual(run.step(.05, data), ('f', False))
+
+    def test_not_castable_alone_is_not_a_cast_confirmation(self):
+        run = ComboRunner(('tornado', 'emp'), 0)
+        data = {'ability3': {'name': 'invoker_tornado', 'can_cast': True, 'cooldown': 0},
+                'ability4': {'name': 'invoker_emp', 'can_cast': True, 'cooldown': 0}}
+        self.assertEqual(run.step(0, data), ('d', False))
+        data['ability3']['can_cast'] = False
+        self.assertIsNone(run.step(.1, data))
+        self.assertEqual(run.index, 0)
+
+    def test_prepares_orbs_during_confirmation_without_early_invoke(self):
+        run = ComboRunner(('tornado', 'emp'), 0)
+        data = {'ability3': {'name': 'invoker_tornado', 'can_cast': True, 'cooldown': 0},
+                'ability4': {'name': 'other'}, 'ability5': {'can_cast': True}}
+        self.assertEqual(run.step(0, data), ('d', False))
+        for now in (.02, .04, .06):
+            self.assertEqual(run.step(now, data, fresh=False), ('w', False))
+        self.assertIsNone(run.step(.5, data, fresh=False))
+        self.assertEqual(run.index, 0)
+        data['ability3']['cooldown'] = 10
+        self.assertIsNone(run.step(.6, data, fresh=False))
+        self.assertEqual(run.step(.7, data), ('r', False))
+        self.assertEqual(run.index, 1)
+
+    def test_partial_preparation_finishes_remaining_orbs_before_invoke(self):
+        run = ComboRunner(('tornado', 'chaos meteor'), 0)
+        data = {'ability3': {'name': 'invoker_tornado', 'can_cast': True, 'cooldown': 0},
+                'ability4': {'name': 'other'}, 'ability5': {'can_cast': True}}
+        run.step(0, data)
+        self.assertEqual(run.step(.02, data, fresh=False), ('w', False))
+        data['ability3']['cooldown'] = 10
+        self.assertEqual(run.step(.04, data), ('e', False))
+        self.assertEqual(run.step(.06, data), ('e', False))
+        self.assertEqual(run.step(.08, data), ('r', False))
+
+    def test_target_retry_needs_no_new_packet_but_confirmation_does(self):
+        run = ComboRunner(('cold snap', 'emp'), 0)
+        data = {'ability3': {'name': 'invoker_cold_snap', 'can_cast': True, 'cooldown': 0},
+                'ability4': {'name': 'invoker_emp', 'can_cast': True, 'cooldown': 0}}
+        self.assertEqual(run.step(0, data), ('d', False))
+        self.assertEqual(run.step(.1, data, fresh=False), ('d', False))
+        data['ability3']['cooldown'] = 10
+        self.assertIsNone(run.step(.11, data, fresh=False))
+        self.assertEqual(run.index, 0)
+        self.assertEqual(run.step(.12, data), ('f', False))
 
 
 if __name__ == '__main__': unittest.main()
