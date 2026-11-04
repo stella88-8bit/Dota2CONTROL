@@ -1,5 +1,5 @@
 import unittest
-from spell_planner import plan_spell
+from spell_planner import plan_spell, slot_for_spell
 from spell_phrases import SPELLS
 
 
@@ -17,6 +17,12 @@ class PlannerTests(unittest.TestCase):
         self.assertIsNone(plan_spell('что угодно', ('a', 'b')))
         self.assertIsNone(plan_spell('слова силы', None))
         self.assertEqual(plan_spell('слова силы', ('a', 'b')).keys, 'r')
+
+    def test_confirmation_finds_actual_slot(self):
+        self.assertEqual(slot_for_spell('cold snap', ('other', 'invoker_cold_snap')), 'f')
+        self.assertEqual(slot_for_spell('cold snap', ('invoker_cold_snap', 'other')), 'd')
+        self.assertIsNone(slot_for_spell('cold snap', ('other', 'other')))
+        self.assertIsNone(slot_for_spell('cold snap', None))
 
 
 if __name__ == '__main__':

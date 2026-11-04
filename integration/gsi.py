@@ -10,6 +10,7 @@ class GSIState:
         self._lock = threading.Lock()
         self._updated = None
         self._slots = None
+        self._abilities = None
 
     def update(self, data):
         hero = data.get('hero')
@@ -22,10 +23,19 @@ class GSIState:
         with self._lock:
             self._updated = time.monotonic()
             self._slots = slots
+            self._abilities = abilities if slots else None
 
-    def snapshot(self, max_age=5):
+    def details(self, max_age=2, after=None):
         with self._lock:
-            if self._updated is None or time.monotonic() - self._updated > max_age:
+            if (self._updated is None or time.monotonic() - self._updated > max_age
+                    or (after is not None and self._updated <= after)):
+                return None
+            return self._abilities
+
+    def snapshot(self, max_age=5, after=None):
+        with self._lock:
+            if (self._updated is None or time.monotonic() - self._updated > max_age
+                    or (after is not None and self._updated <= after)):
                 return None
             return self._slots
 

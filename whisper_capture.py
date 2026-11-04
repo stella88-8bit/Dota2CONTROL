@@ -92,7 +92,7 @@ class PhraseCapture:
                     # Never turn a truncated long speech/noise segment into a spell.
                     self.dropped += 1
                     self._reset()
-                elif self._silence >= self.rate * 0.30:
+                elif self._silence >= self.rate * 0.24:
                     if self._voiced >= self.rate * 0.18:
                         # Keep 100 ms of trailing silence, not the whole endpoint pause.
                         raw = b''.join(self._chunks)
@@ -156,7 +156,7 @@ class PhraseCapture:
                         raise RuntimeError('Некорректный ответ Whisper worker')
                     text = self._read(process.stdout, length).decode('utf-8').strip()
                     done = time.monotonic()
-                    self.last_timing = f'ASR {done-started:.2f}s; after speech ~{done-ended+0.30:.2f}s'
+                    self.last_timing = f'ASR {done-started:.2f}s; after speech ~{done-ended+0.24:.2f}s'
                     # Old/cancelled results must never produce delayed game actions.
                     if token == self.token and done - ended < 3:
                         self.results.put((token, text, None, done))

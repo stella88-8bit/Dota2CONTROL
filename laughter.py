@@ -60,35 +60,44 @@ class LaughterDetector:
 
 
 class LaughterPlayer:
-    def __init__(self, cooldown=20):
+    def __init__(self):
         self.paths = [ROOT / 'voices' / name for name in ('laugh.mp3', 'knowing.mp3', 'carl.mp3')]
-        self.cooldown = cooldown
-        self.last = float('-inf')
         self.process = None
-        self.muted_until = 0.0
+        self._remaining = []
+        self._last_played = None
 
     def is_playing(self):
         if self.process and self.process.poll() is None:
             return True
         if self.process:
+            code = self.process.returncode
+            error = self.process.stderr.read().decode('utf-8', errors='replace').strip()
+            self.process.stderr.close()
             self.process = None
-            self.muted_until = time.monotonic() + 1
-        return time.monotonic() < self.muted_until
+            if code:
+                print('Ошибка воспроизведения Invoker:', error or f'код {code}', flush=True)
+        return False
 
     def play(self):
-        now = time.monotonic()
-        if now - self.last < self.cooldown or self.is_playing():
+        if self.is_playing():
             return None
         available = [p for p in self.paths if p.is_file()]
         if len(available) != 3:
             print('Нет всех трёх файлов реплик Invoker в experiments/laughter/voices.', flush=True)
             return None
-        chosen = random.choice(available)
-        self.process = subprocess.Popen(['/usr/bin/afplay', str(chosen)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        self.last = now
+        if not self._remaining:
+            self._remaining = available.copy()
+            random.shuffle(self._remaining)
+            if self._remaining[-1] == self._last_played:
+                self._remaining[-1], self._remaining[0] = self._remaining[0], self._remaining[-1]
+        chosen = self._remaining.pop()
+        self.process = subprocess.Popen(['/usr/bin/afplay', str(chosen)], stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+        self._last_played = chosen
         return chosen.name
 
     def close(self):
         if self.process and self.process.poll() is None:
             self.process.terminate()
             self.process.wait(timeout=2)
+        if self.process and self.process.stderr:
+            self.process.stderr.close()

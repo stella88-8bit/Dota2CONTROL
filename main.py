@@ -13,17 +13,19 @@ from vosk import KaldiRecognizer, Model, SetLogLevel
 
 from controls import NAMES, VOICE_KEYS, VOICE_PHRASES, voice_commands
 from integration.gsi import GSIState, start_server
-from spell_planner import plan_spell
+from spell_planner import plan_spell, slot_for_spell
 from whisper_capture import PhraseCapture
 from voice_policy import is_stop_result
 from laughter import LaughterDetector, LaughterPlayer
+from combos import match_combo
+from combo_runner import ComboRunner
 
 ROOT = Path(__file__).resolve().parent
 
 
 def main():
     audio = queue.Queue(maxsize=64)
-    state = {'enabled': False, 'overflow': False, 'pending': None, 'awaiting': None, 'playback': False, 'enabled_at': 0.0}
+    state = {'enabled': False, 'overflow': False, 'pending': None, 'awaiting': None, 'combo': None, 'playback': False, 'enabled_at': 0.0}
     gsi = GSIState()
     server = capture = stream = laughter = player = None
     root = tk.Tk()
@@ -42,7 +44,7 @@ def main():
     buttons.pack(pady=10)
 
     def disable(reason='Ввод выключен'):
-        state.update(enabled=False, pending=None, awaiting=None)
+        state.update(enabled=False, pending=None, awaiting=None, combo=None)
         if capture:
             capture.cancel()
         status.set(reason)
@@ -76,9 +78,12 @@ def main():
         if laughter:
             laughter.feed(data if state['enabled'] and not state['playback'] else bytes(len(data)))
 
-    def send(key):
+    def send(key, self_target=False):
         try:
-            pyautogui.press(key)
+            if self_target:
+                pyautogui.hotkey('alt', key)
+            else:
+                pyautogui.press(key)
             last_text.set(f'Отправлено: {NAMES[key]} [{key.upper()}]')
             print('VOICE:', key.upper(), flush=True)
         except Exception as exc:
@@ -91,7 +96,7 @@ def main():
             while True:
                 try: detected_at = laughter.events.get_nowait()
                 except queue.Empty: break
-                if state['enabled'] and detected_at >= state['enabled_at'] and time.monotonic() - detected_at < 2:
+                if state['enabled'] and not state['combo'] and detected_at >= state['enabled_at'] and time.monotonic() - detected_at < 2:
                     try:
                         chosen = player.play()
                         if chosen:
@@ -113,13 +118,13 @@ def main():
             state['overflow'] = False
             recognizer.Reset()
             capture.cancel()
-            state.update(pending=None, awaiting=None)
+            state.update(pending=None, awaiting=None, combo=None)
             last_text.set('Сбой аудио: действие отменено, слушаю следующую команду')
             print('Аудио восстановлено; ввод остаётся включённым.', flush=True)
         if 'stop' in commands and state['enabled']:
             disable('Остановлено командой «стоп»')
         pending, awaiting = state['pending'], state['awaiting']
-        while not pending and not awaiting:
+        while not pending and not awaiting and not state['combo']:
             try: token, text, error, received = capture.results.get_nowait()
             except queue.Empty: break
             if token != capture.token or not state['enabled'] or time.monotonic() - received > 1:
@@ -133,6 +138,15 @@ def main():
             if normalized == 'стоп':
                 disable('Остановлено командой «стоп»')
                 break
+            combo_match = match_combo(text)
+            if combo_match:
+                if not gsi.details():
+                    last_text.set('Прокаст отменён: нет свежих данных GSI')
+                    continue
+                state['combo'] = ComboRunner(combo_match[1], time.monotonic())
+                last_text.set('Прокаст: ' + combo_match[0])
+                print('Прокаст:', combo_match[0], flush=True)
+                break
             direct = {**VOICE_KEYS, **VOICE_PHRASES}.get(normalized)
             if direct:
                 send(direct)
@@ -144,11 +158,25 @@ def main():
             last_text.set(f'{plan.kind}: {plan.spell} ({plan.score:.0%})')
             print('План:', plan, flush=True)
             if plan.kind == 'prepare':
-                pending = {'keys': list(plan.keys), 'spell': plan.spell, 'next': time.monotonic()}
+                pending = {'keys': list(plan.keys), 'spell': plan.spell, 'next': time.monotonic(), 'recognized_at': received}
                 state['pending'] = pending
             else:
                 send(plan.keys)
         now = time.monotonic()
+        combo = state['combo']
+        if combo and state['enabled']:
+            action = combo.step(now, gsi.details(max_age=2, after=combo.after))
+            if action:
+                print('Прокаст:', combo.spells[combo.index], '→', action, flush=True)
+                send(action[0], action[1])
+            if combo.error:
+                last_text.set('Прокаст остановлен: ' + combo.error)
+                print('Прокаст остановлен:', combo.error, flush=True)
+                state['combo'] = None
+            elif combo.complete:
+                last_text.set('Прокаст завершён')
+                print('Прокаст завершён.', flush=True)
+                state['combo'] = None
         if pending and state['enabled'] and now >= pending['next']:
             if gsi.snapshot(max_age=2) is None:
                 state['pending'] = None
@@ -158,16 +186,21 @@ def main():
                 send(key)
                 if state['enabled']:
                     if pending['keys']:
-                        pending['next'] = now + .12
+                        pending['next'] = time.monotonic() + .08
                     else:
                         state['pending'] = None
-                        state['awaiting'] = {'spell': pending['spell'], 'deadline': now + 4}
+                        sent_at = time.monotonic()
+                        state['awaiting'] = {'spell': pending['spell'], 'sent_at': sent_at, 'deadline': sent_at + 4, 'recognized_at': pending['recognized_at']}
         awaiting = state['awaiting']
         if awaiting:
-            current = gsi.snapshot(max_age=2)
-            if current and 'invoker_' + awaiting['spell'].replace(' ', '_') in current:
-                last_text.set('Подготовлено: ' + awaiting['spell'])
+            current = gsi.snapshot(max_age=2, after=awaiting['sent_at'])
+            slot = slot_for_spell(awaiting['spell'], current)
+            if now <= awaiting['deadline'] and slot and state['enabled']:
                 state['awaiting'] = None
+                print('GSI подтвердил:', awaiting['spell'], '— применение', slot.upper(), flush=True)
+                confirmed_at = time.monotonic()
+                print(f'Время отправки сфер и Invoke: {awaiting["sent_at"] - awaiting["recognized_at"]:.2f} с; ожидание GSI после Invoke: {confirmed_at - awaiting["sent_at"]:.2f} с', flush=True)
+                send(slot)
             elif now > awaiting['deadline']:
                 last_text.set('GSI не подтвердил подготовку')
                 state['awaiting'] = None

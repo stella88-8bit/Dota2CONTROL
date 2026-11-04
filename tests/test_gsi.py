@@ -1,4 +1,5 @@
 import unittest
+import time
 from integration.gsi import GSIState
 
 
@@ -23,6 +24,16 @@ class GsiTests(unittest.TestCase):
         state.update({'hero': {'name': 'npc_dota_hero_invoker'}, 'abilities': {
             'ability3': {'name': 'invoker_emp'}, 'ability4': {'name': 'invoker_sun_strike'}}})
         self.assertIsNone(state.snapshot(max_age=-1))
+
+    def test_confirmation_requires_new_update(self):
+        state = GSIState()
+        payload = {'hero': {'name': 'npc_dota_hero_invoker'}, 'abilities': {
+            'ability3': {'name': 'invoker_emp'}, 'ability4': {'name': 'invoker_sun_strike'}}}
+        state.update(payload)
+        marker = time.monotonic()
+        self.assertIsNone(state.snapshot(after=marker))
+        state.update(payload)
+        self.assertEqual(state.snapshot(after=marker), ('invoker_emp', 'invoker_sun_strike'))
 
 
 if __name__ == '__main__':

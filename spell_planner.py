@@ -11,6 +11,17 @@ class SpellPlan:
     score: float
 
 
+def slot_for_spell(spell, slots):
+    if slots is None or len(slots) != 2:
+        return None
+    expected = 'invoker_' + spell.replace(' ', '_')
+    if slots[0] == expected:
+        return 'd'
+    if slots[1] == expected:
+        return 'f'
+    return None
+
+
 def plan_spell(text, slots):
     phrase, score = match_phrase(text)
     if phrase is None:
@@ -20,7 +31,7 @@ def plan_spell(text, slots):
     if phrase == INVOKE_PHRASE:
         return SpellPlan('invoke', 'invoke', 'r', score)
     name, orbs = SPELLS[phrase]
-    internal_name = 'invoker_' + name.replace(' ', '_')
-    if internal_name in slots:
-        return SpellPlan('cast', name, 'd' if slots[0] == internal_name else 'f', score)
+    slot = slot_for_spell(name, slots)
+    if slot:
+        return SpellPlan('cast', name, slot, score)
     return SpellPlan('prepare', name, orbs + 'r', score)

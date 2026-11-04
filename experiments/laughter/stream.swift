@@ -3,15 +3,15 @@ import AVFoundation
 import SoundAnalysis
 
 final class Observer: NSObject, SNResultsObserving {
-    private var consecutive = 0
+    private var armed = true
     func request(_ request: SNRequest, didProduce result: SNResult) {
         guard let result = result as? SNClassificationResult else { return }
         let score = result.classifications.first { $0.identifier == "laughter" }?.confidence ?? 0
-        if score >= 0.50 { consecutive += 1 } else { consecutive = 0 }
-        if consecutive >= 2 {
+        if score < 0.20 { armed = true }
+        if armed && score >= 0.45 && result.classifications.first?.identifier == "laughter" {
             print("LAUGH \(score)")
             fflush(stdout)
-            consecutive = 0
+            armed = false
         }
     }
     func request(_ request: SNRequest, didFailWithError error: Error) { fputs("Sound Analysis: \(error)\n", stderr) }
