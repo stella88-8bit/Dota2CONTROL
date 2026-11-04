@@ -13,9 +13,9 @@ import tempfile
 
 from integration.keyvalues import parse
 from integration.vpk_reader import read_file, source_hash
-from spell_phrases import SPELLS
+from dota_magic.spell_phrases import SPELLS
 
-ROOT = Path(__file__).resolve().parent
+ROOT = Path(__file__).resolve().parent.parent
 DATABASE = ROOT / 'data/invoker.sqlite3'
 RULES = ROOT / 'data/invoker_rules.json'
 DEFAULT_VPK = Path.home() / 'Library/Application Support/Steam/steamapps/common/dota 2 beta/game/dota/pak01_dir.vpk'

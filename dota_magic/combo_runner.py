@@ -1,5 +1,5 @@
 """Nonblocking combo runner. All steps are gated by fresh GSI data."""
-from spell_phrases import SPELLS
+from dota_magic.spell_phrases import SPELLS
 
 ORBS = {name: orbs for name, orbs in SPELLS.values()}
 TARGET_RETRY_INTERVAL = .06

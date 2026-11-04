@@ -5,10 +5,10 @@ import time
 import unittest
 from unittest.mock import Mock
 
-from combo_runner import ORBS
-from combos import COMBOS
+from dota_magic.combo_runner import ORBS
+from dota_magic.combos import COMBOS
 from integration.gsi import GSIState
-from voice_controller import VoiceController
+from dota_magic.voice_controller import VoiceController
 
 
 class Capture:
@@ -135,7 +135,7 @@ class ControllerTests(unittest.TestCase):
         self.assertEqual(len(self.sent), 1)
 
     def test_database_plan_is_executed_by_voice_controller(self):
-        from invoker_database import SpellDatabase
+        from dota_magic.invoker_database import SpellDatabase
         self.setup_control(COMBOS['мой любимый 2007 й'],database=SpellDatabase())
         self.capture.recognize('мой любимый 2007 й')
         self.assertTrue(self.finished.wait(8))
@@ -147,7 +147,7 @@ class ControllerTests(unittest.TestCase):
         self.assertTrue(self.control.enabled)
 
     def test_insufficient_mana_rejects_combo_without_disabling_voice(self):
-        from invoker_database import SpellDatabase
+        from dota_magic.invoker_database import SpellDatabase
         self.setup_control(COMBOS['мама я миракл'],database=SpellDatabase())
         self.payload['hero']['mana']=1
         self.gsi.update(copy.deepcopy(self.payload))
@@ -162,7 +162,7 @@ class ControllerTests(unittest.TestCase):
         self.assertTrue(self.control.enabled)
 
     def test_no_common_tornado_window_is_rejected_before_sending(self):
-        from invoker_database import SpellDatabase
+        from dota_magic.invoker_database import SpellDatabase
         self.setup_control(COMBOS['мама я миракл'],database=SpellDatabase())
         for index in range(3):
             self.payload['abilities']['ability'+str(index)]['level']=1

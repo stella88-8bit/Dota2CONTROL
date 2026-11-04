@@ -1,5 +1,5 @@
 import unittest
-from spell_phrases import SPELLS, identify_phrase
+from dota_magic.spell_phrases import SPELLS, identify_phrase
 
 
 class SpellPhraseTests(unittest.TestCase):

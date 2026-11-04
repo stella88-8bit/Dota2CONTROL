@@ -74,7 +74,7 @@ class TimingPlan:
         release = started_at + self.cast_offsets[spell] + shift
         if 'tornado' in sent and self.landing is not None:
             landing = sent['tornado'] + self.landing - self.cast_offsets['tornado']
-            if spell in self.latencies and spell not in ('tornado','forge spirit','alacrity'):
+            if spell in self.latencies and spell not in ('tornado','forge spirit','alacrity') and not (spell == 'cold snap' and self.order.index(spell) < self.order.index('tornado')):
                 release = max(release, landing + LAND_MARGIN - self.latencies[spell])
             if spell == 'cold snap':
                 release = max(release, landing + LAND_MARGIN)
@@ -92,7 +92,7 @@ class TimingPlan:
         return {name: {'impact_after_command_s': self.latencies[name],
                        'relative_to_landing_s': stamp+self.latencies[name]-landing,
                        'within_nominal_window': LAND_MARGIN-.001 <= stamp+self.latencies[name]-landing <= HIT_WINDOW+.001}
-                for name, stamp in sent.items() if name in self.latencies and name not in ('tornado','forge spirit','alacrity')}
+                for name, stamp in sent.items() if name in self.latencies and name not in ('tornado','forge spirit','alacrity') and not (name == 'cold snap' and self.order.index(name) < self.order.index('tornado'))}
 
     def as_dict(self):
         return {'order': self.order, 'warmup': self.warmup, 'hero_level': self.profile['hero_level'],
@@ -182,6 +182,8 @@ def _candidate(order, profile, abilities, distance, warm, strict):
         for spell in order:
             if spell in ('tornado','forge spirit','alacrity'):
                 continue
+            if spell == 'cold snap' and order.index(spell) < order.index('tornado'):
+                continue
             if spell == 'cold snap':
                 # Do not even issue the targeted command while the target is airborne.
                 edges.append((anchor, 'cast:'+spell, lift_offset+LAND_MARGIN))
@@ -219,9 +221,14 @@ def plan_combo(spells, profile, abilities, distance=600, source_sha256=''):
     # Put Cold Snap last in Tornado combos: all timed projectiles can be launched
     # before its retry-until-targeted GSI barrier. The cursor remains user-controlled.
     if 'tornado' in spells:
-        tail = ('cold snap',) if 'cold snap' in spells else ()
-        other = tuple(s for s in spells if s != 'cold snap')
-        orders = [order+tail for order in itertools.permutations(other)]
+        rampage = len(spells) == 8 and 'forge spirit' in spells and 'deafening blast' in spells
+        if rampage:
+            other = tuple(s for s in spells if s not in ('cold snap','deafening blast'))
+            orders = [('cold snap',)+order+('deafening blast',) for order in itertools.permutations(other)]
+        else:
+            tail = ('cold snap',) if 'cold snap' in spells else ()
+            other = tuple(s for s in spells if s != 'cold snap')
+            orders = [order+tail for order in itertools.permutations(other)]
     else:
         orders = [tuple(spells)]
     plans = []
@@ -267,8 +274,8 @@ def main():
     import argparse
     import json
     from pathlib import Path
-    from combos import COMBOS
-    from invoker_database import SpellDatabase
+    from dota_magic.combos import COMBOS
+    from dota_magic.invoker_database import SpellDatabase
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--hero-level',type=int,default=30)
     parser.add_argument('--quas',type=int,default=8)

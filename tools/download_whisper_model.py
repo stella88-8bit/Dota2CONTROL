@@ -5,7 +5,7 @@ from pathlib import Path
 import tempfile
 import urllib.request
 
-ROOT = Path(__file__).resolve().parent
+ROOT = Path(__file__).resolve().parent.parent
 DESTINATION = ROOT / 'models' / 'ggml-small-q5_1.bin'
 URL = 'https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small-q5_1.bin'
 SHA256 = 'ae85e4a935d7a567bd102fe55afc16bb595bdb618e11b2fc7591bc08120411bb'

@@ -1,6 +1,6 @@
 """Plan spell actions from recognised phrases and current, verified GSI slots."""
 from dataclasses import dataclass
-from spell_phrases import SPELLS, INVOKE_PHRASE, match_phrase
+from dota_magic.spell_phrases import SPELLS, INVOKE_PHRASE, match_phrase
 
 
 @dataclass(frozen=True)

@@ -1,10 +1,10 @@
 import copy
 import unittest
 
-from combos import COMBOS
-from combo_timing import plan_combo, collision_flight, LAND_MARGIN, HIT_WINDOW
-from invoker_database import SpellDatabase
-from predictive_combo import PredictiveComboRunner
+from dota_magic.combos import COMBOS
+from dota_magic.combo_timing import plan_combo, collision_flight, LAND_MARGIN, HIT_WINDOW
+from dota_magic.invoker_database import SpellDatabase
+from dota_magic.predictive_combo import PredictiveComboRunner
 
 
 def abilities(levels=(8,8,9)):
@@ -31,7 +31,7 @@ class TimingTests(unittest.TestCase):
                 self.assertTrue(p.synchronized,name)
                 if p.landing is None:continue
                 for spell in p.order:
-                    if spell in ('tornado','forge spirit','alacrity'):continue
+                    if spell in ('tornado','forge spirit','alacrity') or (spell == 'cold snap' and p.order.index(spell) < p.order.index('tornado')):continue
                     impact=p.cast_offsets[spell]+p.latencies[spell]
                     self.assertGreaterEqual(impact-p.landing,LAND_MARGIN-1e-8)
                     self.assertLessEqual(impact-p.landing,HIT_WINDOW+1e-8)
@@ -40,9 +40,12 @@ class TimingTests(unittest.TestCase):
                     for damage in ('emp','sun strike','chaos meteor'):
                         if damage in p.order:
                             self.assertGreaterEqual(blast,p.cast_offsets[damage]+p.latencies[damage]+LAND_MARGIN-1e-8)
-                if 'cold snap' in spells:
+                if 'cold snap' in spells and name != 'ремпейдж':
                     self.assertEqual(p.order[-1],'cold snap')
                     self.assertGreaterEqual(p.cast_offsets['cold snap'],p.landing+LAND_MARGIN-1e-8)
+                if name == 'ремпейдж':
+                    self.assertEqual(p.order[0],'cold snap')
+                    self.assertEqual(p.order[-1],'deafening blast')
 
     def test_low_quas_two_spell_combo_can_charge_emp_before_tornado(self):
         p=plan_combo(('tornado','emp'),self.db.profile(6,1,1,1),abilities((1,1,1)),600)
@@ -100,7 +103,7 @@ class TimingTests(unittest.TestCase):
                     if key in 'qwe':orbs.append(key)
                     elif key=='r':
                         self.assertGreaterEqual(now+1e-8,invoke_ready)
-                        from combo_runner import ORBS
+                        from dota_magic.combo_runner import ORBS
                         spell=next(name for name,combo in ORBS.items() if combo==''.join(orbs[-3:]))
                         data['ability4']=copy.deepcopy(data['ability3'])
                         data['ability3']={'name':'invoker_'+spell.replace(' ','_'),'can_cast':True,'cooldown':0}
@@ -134,7 +137,7 @@ class TimingTests(unittest.TestCase):
         self.assertTrue(plan.warmup)
         run=PredictiveComboRunner(plan.order,0,timing=plan)
         orbs=[];invokes=[];casts=[];now=0
-        from combo_runner import ORBS
+        from dota_magic.combo_runner import ORBS
         while now<10 and len(casts)<2:
             action=run.step(now,data,now)
             if action:

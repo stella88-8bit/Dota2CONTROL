@@ -61,7 +61,7 @@ Cold Snap сохраняет прежнее поведение: повторяе
 ## Локальный стенд
 
 ```sh
-.venv/bin/python benchmark_latency.py --repeats 3 --gsi-ms 1000 --output outputs/predictive-combos-1s-gsi.json
+.venv/bin/python -m tools.benchmark_latency --repeats 3 --gsi-ms 1000 --output outputs/predictive-combos-1s-gsi.json
 .venv/bin/python -m unittest discover -s tests -q
 ```
 

@@ -4,13 +4,13 @@ import re
 import threading
 import time
 
-from combo_runner import ComboRunner
-from predictive_combo import PredictiveComboRunner
-from combos import match_combo
-from controls import NAMES, VOICE_KEYS, VOICE_PHRASES
-from low_latency import LowLatencyActivity
-from spell_planner import plan_spell
-from combo_timing import plan_combo
+from dota_magic.combo_runner import ComboRunner
+from dota_magic.predictive_combo import PredictiveComboRunner
+from dota_magic.combos import match_combo
+from dota_magic.controls import NAMES, VOICE_KEYS, VOICE_PHRASES
+from dota_magic.low_latency import LowLatencyActivity
+from dota_magic.spell_planner import plan_spell
+from dota_magic.combo_timing import plan_combo
 
 
 class VoiceController:

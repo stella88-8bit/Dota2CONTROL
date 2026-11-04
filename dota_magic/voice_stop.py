@@ -3,7 +3,7 @@ import json
 import queue
 import threading
 
-from voice_policy import is_stop_result
+from dota_magic.voice_policy import is_stop_result
 
 
 class StopListener:

@@ -1,6 +1,6 @@
 import unittest
-from combos import COMBOS, match_combo
-from combo_runner import ComboRunner, ORBS
+from dota_magic.combos import COMBOS, match_combo
+from dota_magic.combo_runner import ComboRunner, ORBS
 
 
 class ComboTests(unittest.TestCase):

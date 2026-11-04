@@ -2,7 +2,7 @@ import time
 import unittest
 from unittest.mock import patch
 import numpy as np
-from whisper_capture import PhraseCapture
+from dota_magic.whisper_capture import PhraseCapture
 
 
 class VoiceStreamTests(unittest.TestCase):

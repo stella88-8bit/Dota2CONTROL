@@ -6,9 +6,9 @@ from pathlib import Path
 import sqlite3
 import time
 
-from combo_timing import plan_combo, LAND_MARGIN, HIT_WINDOW
-from combos import COMBOS
-from invoker_database import SpellDatabase, DATABASE
+from dota_magic.combo_timing import plan_combo, LAND_MARGIN, HIT_WINDOW
+from dota_magic.combos import COMBOS
+from dota_magic.invoker_database import SpellDatabase, DATABASE
 
 
 def main():
@@ -47,7 +47,7 @@ def main():
                     assert b-a+1e-8>=plan.invoke_cooldown
                 if plan.synchronized and plan.landing is not None:
                     for spell in plan.order:
-                        if spell in ('tornado','forge spirit','alacrity'):continue
+                        if spell in ('tornado','forge spirit','alacrity') or (spell == 'cold snap' and plan.order.index(spell) < plan.order.index('tornado')):continue
                         delta=plan.cast_offsets[spell]+plan.latencies[spell]-plan.landing
                         assert LAND_MARGIN-1e-7<=delta<=HIT_WINDOW+1e-7,(phrase,levels,distance,spell,delta)
                 info=statistics[phrase]

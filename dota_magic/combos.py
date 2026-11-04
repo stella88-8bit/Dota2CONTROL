@@ -6,7 +6,7 @@ COMBOS = {
     'мама я миракл': ('tornado', 'emp', 'chaos meteor', 'deafening blast'),
     'от меня не убежишь': ('ice wall', 'cold snap', 'forge spirit', 'alacrity'),
     'мой любимый 2007 й': ('tornado', 'cold snap', 'sun strike', 'chaos meteor', 'deafening blast'),
-    'ремпейдж': ('cold snap', 'tornado', 'emp', 'sun strike', 'chaos meteor', 'forge spirit', 'alacrity'),
+    'ремпейдж': ('cold snap', 'tornado', 'emp', 'sun strike', 'chaos meteor', 'forge spirit', 'alacrity', 'deafening blast'),
 }
 
 

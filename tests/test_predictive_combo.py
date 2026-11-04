@@ -1,7 +1,7 @@
 import copy
 import unittest
 
-from predictive_combo import PredictiveComboRunner, invoke_cooldown
+from dota_magic.predictive_combo import PredictiveComboRunner, invoke_cooldown
 
 
 def state(level=8):

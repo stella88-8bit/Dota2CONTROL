@@ -11,11 +11,11 @@ from tkinter import ttk
 import wave
 
 import sounddevice as sd
-from spell_phrases import SPELLS, INVOKE_PHRASE, match_phrase
-from spell_planner import plan_spell
+from dota_magic.spell_phrases import SPELLS, INVOKE_PHRASE, match_phrase
+from dota_magic.spell_planner import plan_spell
 from integration.gsi import GSIState, start_server
 
-ROOT = Path(__file__).resolve().parent
+ROOT = Path(__file__).resolve().parent.parent
 CLI = ROOT / 'integration' / 'whisper-bin' / 'whisper-cli'
 MODEL = ROOT / 'models' / 'ggml-small-q5_1.bin'
 PHRASES = list(SPELLS) + [INVOKE_PHRASE]

@@ -3,7 +3,7 @@
 Timing defaults come from the installed npc_dota_hero_invoker definition:
 Invoke 7 - 0.3 * total orb levels; spell cast point 0.05 seconds.
 """
-from combo_runner import ORBS, TARGET_RETRY_INTERVAL
+from dota_magic.combo_runner import ORBS, TARGET_RETRY_INTERVAL
 
 KEY_GAP = .012
 INVOKE_SETTLE = .065

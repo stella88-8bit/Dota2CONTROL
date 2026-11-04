@@ -10,7 +10,7 @@ import mediapipe as mp
 from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
 
-MODEL = Path(__file__).resolve().parent.parent / 'models' / 'hand_landmarker.task'
+MODEL = Path(__file__).resolve().parents[2] / 'models' / 'hand_landmarker.task'
 EMOJIS = ['✌️', '🖐️', '✊', '👍', '👎', '☝️', '🤘', '🤙', '👌', '🤏']
 KEYS = ['victory', 'palm', 'fist', 'up', 'down', 'point', 'rock', 'shaka', 'ok', 'pinch']
 EMOJI_FONT = ImageFont.truetype('/System/Library/Fonts/Apple Color Emoji.ttc', 40)

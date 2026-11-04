@@ -1,6 +1,6 @@
 import unittest
-from spell_planner import plan_spell, slot_for_spell
-from spell_phrases import SPELLS
+from dota_magic.spell_planner import plan_spell, slot_for_spell
+from dota_magic.spell_phrases import SPELLS
 
 
 class PlannerTests(unittest.TestCase):

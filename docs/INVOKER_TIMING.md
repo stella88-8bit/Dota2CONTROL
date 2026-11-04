@@ -82,13 +82,13 @@ Scepter повторно не прибавляется. Выбор талант�
 ## Как строится расписание
 
 «Рэмпейдж» (также `Rampage`) содержит Cold Snap, Tornado, EMP, Sun Strike,
-Chaos Meteor, Forge Spirit и Alacrity на Invoker. Как и для остальных прокастов,
+Chaos Meteor, Forge Spirit, Alacrity на Invoker и завершающий Deafening Blast. Как и для остальных прокастов,
 планировщик может изменить порядок ради таймингов.
 
 Планировщик перебирает порядок допустимых заклинаний и варианты подготовки первых
 двух ячеек. Он учитывает текущие D/F, перезарядку Invoke, отправку сфер и время
-каста. В связках с Tornado Cold Snap ставится последним: его повтор до успешного
-наведения сохраняется, но не задерживает запуск долгих заклинаний.
+каста. В «Рэмпейдж» Cold Snap применяется первым, а Blast — последним; в других
+связках с Tornado Cold Snap ставится последним. Повтор до успешного наведения сохраняется.
 
 Для расчёта полёта используется передний край снаряда: у Tornado вычитается радиус,
 а у Blast учитывается расширение конуса. Цель в этой модели — неподвижная точка;
@@ -143,7 +143,7 @@ SHA-256 исходного файла:
 пересобирается атомарно. Для другой папки игры или ручного обновления:
 
 ```sh
-.venv/bin/python invoker_database.py --build --vpk "/путь/к/pak01_dir.vpk"
+.venv/bin/python -m dota_magic.invoker_database --build --vpk "/путь/к/pak01_dir.vpk"
 ```
 
 Снимок уровней и талантов фиксируется для планирования принятой голосовой команды.
@@ -155,17 +155,17 @@ SHA-256 исходного файла:
 
 ```sh
 # Все параметры для выбранных уровней
-.venv/bin/python invoker_database.py --hero-level 20 --quas 5 --wex 7 --exort 6
+.venv/bin/python -m dota_magic.invoker_database --hero-level 20 --quas 5 --wex 7 --exort 6
 
 # Все четыре плана для заданной дистанции
-.venv/bin/python combo_timing.py --hero-level 30 --quas 8 --wex 8 --exort 9 --distance 600
+.venv/bin/python -m dota_magic.combo_timing --hero-level 30 --quas 8 --wex 8 --exort 9 --distance 600
 
 # Полное покрытие базовых уровней и проверка расписаний
-.venv/bin/python verify_invoker_timing.py
+.venv/bin/python -m tools.verify_invoker_timing
 .venv/bin/python -m unittest discover -s tests -q
 
 # Настоящий исполнитель и HTTP GSI с задержкой 1 с, игра и клавиатура имитируются
-.venv/bin/python benchmark_latency.py --timed --levels 8 8 9 --distance 600 --gsi-ms 1000 --repeats 1 --output outputs/invoker-timed-controller.json
+.venv/bin/python -m tools.benchmark_latency --timed --levels 8 8 9 --distance 600 --gsi-ms 1000 --repeats 1 --output outputs/invoker-timed-controller.json
 ```
 
 Сохранённый ранее `outputs/invoker-timing-coverage.json` содержит проверки 6 561

@@ -5,7 +5,7 @@ import sqlite3
 import unittest
 
 from integration.keyvalues import parse
-from invoker_database import DATABASE, RULES, SpellDatabase
+from dota_magic.invoker_database import DATABASE, RULES, SpellDatabase
 
 
 class DatabaseTests(unittest.TestCase):

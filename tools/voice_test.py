@@ -7,7 +7,7 @@ from vosk import KaldiRecognizer, Model, SetLogLevel
 
 
 def main():
-    model_path = Path(__file__).parent / 'models' / 'vosk-model-small-ru-0.22'
+    model_path = Path(__file__).resolve().parent.parent / 'models' / 'vosk-model-small-ru-0.22'
     if not model_path.exists():
         print('Модель Vosk не найдена:', model_path)
         return

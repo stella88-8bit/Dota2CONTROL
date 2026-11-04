@@ -18,7 +18,7 @@ def fingers_touch(hand, width, height):
 
 
 def main():
-    model = Path(__file__).parent / "models" / "hand_landmarker.task"
+    model = Path(__file__).resolve().parents[2] / "models" / "hand_landmarker.task"
     options = vision.HandLandmarkerOptions(
         base_options=python.BaseOptions(model_asset_path=str(model)),
         running_mode=vision.RunningMode.VIDEO,

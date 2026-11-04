@@ -2,7 +2,7 @@
 from pathlib import Path
 import subprocess
 
-root = Path(__file__).resolve().parent
+root = Path(__file__).resolve().parent.parent
 source = root / 'integration/whisper.cpp'
 bin_dir = root / 'integration/whisper-bin'
 if not (source / 'include/whisper.h').exists():

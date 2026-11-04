@@ -1,5 +1,5 @@
 import unittest
-from controls import GestureTrigger, voice_commands
+from dota_magic.controls import GestureTrigger, voice_commands
 
 
 class ControlsTests(unittest.TestCase):

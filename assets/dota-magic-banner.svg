@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="420" viewBox="0 0 1440 420" role="img" aria-labelledby="title desc">
+  <title id="title">DOTA MAGIC — Invoker voice control</title>
+  <desc id="desc">Dark cover with three luminous blue, violet and amber orbs representing Quas, Wex and Exort.</desc>
+  <defs>
+    <linearGradient id="background" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#111527"/><stop offset=".57" stop-color="#121123"/><stop offset="1" stop-color="#211320"/></linearGradient>
+    <linearGradient id="headline" x1="0" y1="0" x2="1" y2="0"><stop stop-color="#fff"/><stop offset="1" stop-color="#cbd7ff"/></linearGradient>
+    <radialGradient id="blue"><stop stop-color="#b5f2ff"/><stop offset=".27" stop-color="#54c5f2"/><stop offset=".75" stop-color="#1968a3"/><stop offset="1" stop-color="#12213c"/></radialGradient>
+    <radialGradient id="purple"><stop stop-color="#f3d3ff"/><stop offset=".27" stop-color="#bb83fd"/><stop offset=".75" stop-color="#6832a8"/><stop offset="1" stop-color="#24183d"/></radialGradient>
+    <radialGradient id="amber"><stop stop-color="#fff0bd"/><stop offset=".27" stop-color="#ffbd65"/><stop offset=".75" stop-color="#b94d30"/><stop offset="1" stop-color="#361c24"/></radialGradient>
+    <filter id="blur"><feGaussianBlur stdDeviation="26"/></filter>
+    <filter id="small-blur"><feGaussianBlur stdDeviation="7"/></filter>
+  </defs>
+  <rect width="1440" height="420" rx="20" fill="url(#background)"/>
+  <path d="M0 360 565 0M100 420 660 0M265 420 825 0" stroke="#aab2ff" stroke-opacity=".055" stroke-width="1"/>
+  <path d="M0 300H1440M0 370H1440" stroke="#aab2ff" stroke-opacity=".045"/>
+  <circle cx="1160" cy="198" r="225" fill="none" stroke="#d0a3ff" stroke-opacity=".09"/>
+  <circle cx="1160" cy="198" r="178" fill="none" stroke="#d0a3ff" stroke-opacity=".11" stroke-dasharray="2 12"/>
+  <circle cx="1160" cy="198" r="134" fill="none" stroke="#d0a3ff" stroke-opacity=".08"/>
+  <circle cx="958" cy="228" r="66" fill="#36bff5" opacity=".25" filter="url(#blur)"/>
+  <circle cx="1115" cy="150" r="70" fill="#ac6ef7" opacity=".27" filter="url(#blur)"/>
+  <circle cx="1275" cy="227" r="68" fill="#ff914e" opacity=".25" filter="url(#blur)"/>
+  <path d="M958 228 1115 150 1275 227" fill="none" stroke="#d9c1ff" stroke-opacity=".20" stroke-width="1.5"/>
+  <g><circle cx="958" cy="228" r="66" fill="url(#blue)" stroke="#80dfff" stroke-opacity=".7"/><circle cx="938" cy="205" r="16" fill="#d6f9ff" opacity=".32" filter="url(#small-blur)"/><circle cx="958" cy="228" r="51" fill="none" stroke="#cff5ff" stroke-opacity=".18"/><text x="958" y="237" text-anchor="middle" fill="#effcff" font-family="Arial,sans-serif" font-size="26" font-weight="700">Q</text></g>
+  <g><circle cx="1115" cy="150" r="72" fill="url(#purple)" stroke="#dbb4ff" stroke-opacity=".75"/><circle cx="1093" cy="124" r="17" fill="#f9e7ff" opacity=".34" filter="url(#small-blur)"/><circle cx="1115" cy="150" r="56" fill="none" stroke="#f2dfff" stroke-opacity=".2"/><text x="1115" y="159" text-anchor="middle" fill="#fbf2ff" font-family="Arial,sans-serif" font-size="26" font-weight="700">W</text></g>
+  <g><circle cx="1275" cy="227" r="66" fill="url(#amber)" stroke="#ffc68a" stroke-opacity=".75"/><circle cx="1253" cy="204" r="16" fill="#fff5d2" opacity=".34" filter="url(#small-blur)"/><circle cx="1275" cy="227" r="51" fill="none" stroke="#ffebcd" stroke-opacity=".2"/><text x="1275" y="236" text-anchor="middle" fill="#fff8ea" font-family="Arial,sans-serif" font-size="26" font-weight="700">E</text></g>
+  <text x="78" y="91" fill="#9ba8d7" font-family="Arial,sans-serif" font-size="15" font-weight="700" letter-spacing="4">VOICE CONTROL  /  INVOKER</text>
+  <text x="74" y="197" fill="url(#headline)" font-family="Arial,sans-serif" font-size="76" font-weight="800" letter-spacing="-3">DOTA MAGIC</text>
+  <text x="79" y="240" fill="#a8b2d3" font-family="Arial,sans-serif" font-size="24">Spells, combinations and timing — by voice.</text>
+  <rect x="78" y="291" width="303" height="44" rx="22" fill="#c49bff" fill-opacity=".10" stroke="#d7b8ff" stroke-opacity=".25"/>
+  <circle cx="104" cy="313" r="4" fill="#8ff0d3"/>
+  <text x="119" y="319" fill="#d8c9f5" font-family="Arial,sans-serif" font-size="14" font-weight="700" letter-spacing="1.3">LOCAL  ·  MACOS  ·  DOTA 2</text>
+  <text x="78" y="389" fill="#7180a7" font-family="Arial,sans-serif" font-size="12" letter-spacing="2">QUAS   /   WEX   /   EXORT</text>
+</svg>

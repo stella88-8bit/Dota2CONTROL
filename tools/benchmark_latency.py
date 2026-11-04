@@ -12,12 +12,12 @@ import threading
 import time
 from pathlib import Path
 
-from combo_runner import ORBS
-from combos import COMBOS
+from dota_magic.combo_runner import ORBS
+from dota_magic.combos import COMBOS
 from integration.gsi import GSIState, start_server
-from voice_controller import VoiceController
-from predictive_combo import invoke_cooldown
-from invoker_database import SpellDatabase
+from dota_magic.voice_controller import VoiceController
+from dota_magic.predictive_combo import invoke_cooldown
+from dota_magic.invoker_database import SpellDatabase
 
 
 class Capture:

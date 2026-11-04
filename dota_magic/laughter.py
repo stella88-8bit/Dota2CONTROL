@@ -6,7 +6,7 @@ import subprocess
 import threading
 import time
 
-ROOT = Path(__file__).resolve().parent / 'experiments' / 'laughter'
+ROOT = Path(__file__).resolve().parent.parent / 'experiments' / 'laughter'
 
 
 class LaughterDetector:

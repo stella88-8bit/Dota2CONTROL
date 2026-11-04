@@ -9,11 +9,11 @@ import sounddevice as sd
 from vosk import KaldiRecognizer, Model, SetLogLevel
 
 from integration.gsi import GSIState, start_server
-from whisper_capture import PhraseCapture
-from laughter import LaughterDetector, LaughterPlayer
-from voice_controller import VoiceController
-from voice_stop import StopListener
-from invoker_database import SpellDatabase, ensure_database
+from dota_magic.whisper_capture import PhraseCapture
+from dota_magic.laughter import LaughterDetector, LaughterPlayer
+from dota_magic.voice_controller import VoiceController
+from dota_magic.voice_stop import StopListener
+from dota_magic.invoker_database import SpellDatabase, ensure_database
 
 ROOT = Path(__file__).resolve().parent
 

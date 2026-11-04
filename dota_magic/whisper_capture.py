@@ -10,7 +10,7 @@ from pathlib import Path
 
 import numpy as np
 
-ROOT = Path(__file__).resolve().parent
+ROOT = Path(__file__).resolve().parent.parent
 MODEL = ROOT / 'models/ggml-small-q5_1.bin'
 WORKER = ROOT / 'integration/whisper-bin/whisper-worker'
 
@@ -124,7 +124,8 @@ class PhraseCapture:
     def _recognize_once(self):
         try:
             # stderr is retained for diagnostics, never mixed with the binary protocol.
-            with (ROOT / 'whisper-worker.log').open('w') as log:
+            (ROOT / 'logs').mkdir(exist_ok=True)
+            with (ROOT / 'logs/whisper-worker.log').open('w') as log:
                 env = os.environ.copy()
                 if self._force_cpu:
                     env['DOTA_WHISPER_CPU'] = '1'
